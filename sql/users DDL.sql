@@ -1,0 +1,10 @@
+CREATE DATABASE hi_connect;
+USE hi_connect;
+
+CREATE TABLE users(
+	user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    email VARCHAR(255) UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
