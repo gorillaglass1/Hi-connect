@@ -9,10 +9,12 @@ class Create_charging_log(BaseModel):
     vehicle_id: int
     start_time: datetime
     end_time: datetime
-    charged_amount: float
-    waiting_time: int
+    charged_amount: float | None
+    charging_cost: float | None
+    waiting_time: int | None
 
 class charging_log_schemas_Response(BaseModel):
     charging_log_id: int
-    model_config: ConfigDict(from_attributes=True)
+    updated_at: datetime | None = None
+    model_config = ConfigDict(from_attributes=True)
 

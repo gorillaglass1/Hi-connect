@@ -3,8 +3,8 @@ from pydantic import BaseModel, ConfigDict, EmailStr
 
 class UserCreate(BaseModel):
     name: str
-    phone: str
-    email: EmailStr
+    phone: str | None
+    email: EmailStr | None
 
 
 class UserResponse(UserCreate):
