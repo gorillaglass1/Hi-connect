@@ -30,13 +30,13 @@ async def create_reservation(
 
 async def get_reservations(
     db: AsyncSession,
-    hydrogen_station_reservation_id: int,
-    hydrogen_charger_id: int,
-    hydrogen_station_id: int,
-    user_id: int,
-    reservation_status: str,
-    reservation_time: datetime,
-    expire_time: datetime,
+    hydrogen_station_reservation_id: int | None,
+    hydrogen_charger_id: int | None,
+    hydrogen_station_id: int | None,
+    user_id: int | None,
+    reservation_status: str | None,
+    reservation_time: datetime | None,
+    expire_time: datetime | None,
     limit: int = 100,
     offset: int = 0,
 ):
