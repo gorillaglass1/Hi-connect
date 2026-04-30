@@ -11,3 +11,4 @@ class User(Base):
     phone = Column(String(20))
     email = Column(String(255), unique=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
+
