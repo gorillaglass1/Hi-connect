@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import hydrogen_station_repo
-from app.schemas.hydrogen_station_schema import HydrogenStationCreate
+from app.schemas.hydrogen_station_schema import HydrogenStationCreate, HydrogenStationUpdate
 
 
 class HydrogenStationService:
@@ -54,3 +54,24 @@ class HydrogenStationService:
             limit=limit,
             offset=offset,
         )
+
+    async def update_station(self, hydrogen_station_id: int, payload: HydrogenStationUpdate):
+        if payload.total_chargers is not None and payload.total_chargers < 0:
+            raise HTTPException(status_code=400, detail="total_chargers must be >= 0")
+
+        row = await hydrogen_station_repo.update_hydrogen_station(
+            self.db,
+            hydrogen_station_id=hydrogen_station_id,
+            name=payload.name,
+            address=payload.address,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            contact_number=payload.contact_number,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+            total_chargers=payload.total_chargers,
+            payment_supported=payload.payment_supported,
+        )
+        if row is None:
+            raise HTTPException(status_code=404, detail="Hydrogen station not found")
+        return row

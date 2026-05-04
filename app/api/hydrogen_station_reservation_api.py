@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.schemas.hydrogen_station_reservation_schemas import (
     HydrogenStationReservationCreate,
     HydrogenStationReservationResponse,
+    HydrogenStationReservationUpdate,
 )
 from app.services.hydrogen_station_reservation_service import (
     HydrogenStationReservationService,
@@ -46,4 +47,19 @@ async def list_reservations(
         expire_time,
         limit,
         offset,
+    )
+
+
+@router.patch(
+    "/{hydrogen_station_reservation_id}",
+    response_model=HydrogenStationReservationResponse,
+)
+async def update_reservation(
+    hydrogen_station_reservation_id: int,
+    payload: HydrogenStationReservationUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    return await HydrogenStationReservationService(db).update_reservation(
+        hydrogen_station_reservation_id,
+        payload,
     )

@@ -13,6 +13,16 @@ class VehicleCreate(BaseModel):
     avg_efficiency: float | None = None
 
 
+class VehicleUpdate(BaseModel):
+    user_id: int | None = None
+    vehicle_number: str | None = None
+    model: str | None = None
+    vehicle_type: str | None = None
+    fuel_type: str | None = None
+    tank_capacity: float | None = None
+    avg_efficiency: float | None = None
+
+
 class VehicleResponse(VehicleCreate):
     vehicle_id: int
     registered_at: datetime | None = None

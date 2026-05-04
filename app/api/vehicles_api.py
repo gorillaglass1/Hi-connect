@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.schemas.vehicles_schema import VehicleCreate, VehicleResponse
+from app.schemas.vehicles_schema import VehicleCreate, VehicleResponse, VehicleUpdate
 from app.services.vehicle_service import VehicleService
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
@@ -28,3 +28,12 @@ async def list_vehicles(
 @router.get("/{vehicle_id}", response_model=VehicleResponse)
 async def get_vehicle(vehicle_id: int, db: AsyncSession = Depends(get_db)):
     return await VehicleService(db).get_vehicle_by_id(vehicle_id)
+
+
+@router.patch("/{vehicle_id}", response_model=VehicleResponse)
+async def update_vehicle(
+    vehicle_id: int,
+    payload: VehicleUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    return await VehicleService(db).update_vehicle(vehicle_id, payload)

@@ -84,3 +84,41 @@ async def get_reservations(
     )
     result = await db.execute(query)
     return result.scalars().all()
+
+
+async def update_reservation(
+    db: AsyncSession,
+    hydrogen_station_reservation_id: int,
+    hydrogen_charger_id: int | None = None,
+    hydrogen_station_id: int | None = None,
+    reservation_status: str | None = None,
+    user_id: int | None = None,
+    reservation_time: datetime | None = None,
+    expire_time: datetime | None = None,
+):
+    result = await db.execute(
+        select(HydrogenStationReservation).where(
+            HydrogenStationReservation.hydrogen_station_reservation_id
+            == hydrogen_station_reservation_id
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None
+
+    if hydrogen_charger_id is not None:
+        row.hydrogen_charger_id = hydrogen_charger_id
+    if hydrogen_station_id is not None:
+        row.hydrogen_station_id = hydrogen_station_id
+    if reservation_status is not None:
+        row.reservation_status = reservation_status
+    if user_id is not None:
+        row.user_id = user_id
+    if reservation_time is not None:
+        row.reservation_time = reservation_time
+    if expire_time is not None:
+        row.expire_time = expire_time
+
+    await db.commit()
+    await db.refresh(row)
+    return row

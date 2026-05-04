@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import vehicles_repo
-from app.schemas.vehicles_schema import VehicleCreate
+from app.schemas.vehicles_schema import VehicleCreate, VehicleUpdate
 
 
 class VehicleService:
@@ -61,3 +61,39 @@ class VehicleService:
             limit=limit,
             offset=offset,
         )
+
+    async def update_vehicle(self, vehicle_id: int, payload: VehicleUpdate):
+        if payload.tank_capacity is not None and payload.tank_capacity <= 0:
+            raise HTTPException(status_code=400, detail="tank_capacity must be greater than 0")
+        if payload.avg_efficiency is not None and payload.avg_efficiency <= 0:
+            raise HTTPException(status_code=400, detail="avg_efficiency must be greater than 0")
+
+        if payload.vehicle_number is not None:
+            exists = await vehicles_repo.get_vehicles(
+                self.db,
+                vehicle_number=payload.vehicle_number,
+                limit=1,
+            )
+            existing = exists[0] if exists else None
+            if existing is not None and existing.vehicle_id != vehicle_id:
+                raise HTTPException(status_code=409, detail="Vehicle number already exists")
+
+        try:
+            row = await vehicles_repo.update_vehicle(
+                self.db,
+                vehicle_id=vehicle_id,
+                user_id=payload.user_id,
+                vehicle_number=payload.vehicle_number,
+                model=payload.model,
+                vehicle_type=payload.vehicle_type,
+                fuel_type=payload.fuel_type,
+                tank_capacity=payload.tank_capacity,
+                avg_efficiency=payload.avg_efficiency,
+            )
+        except IntegrityError:
+            await self.db.rollback()
+            raise HTTPException(status_code=409, detail="Vehicle update conflict")
+
+        if row is None:
+            raise HTTPException(status_code=404, detail="Vehicle not found")
+        return row

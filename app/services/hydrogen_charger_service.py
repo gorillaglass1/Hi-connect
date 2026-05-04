@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import hydrogen_charger_repo
-from app.schemas.hydrogen_charger_schema import HydrogenChargerCreate
+from app.schemas.hydrogen_charger_schema import HydrogenChargerCreate, HydrogenChargerUpdate
 
 
 class HydrogenChargerService:
@@ -41,3 +41,21 @@ class HydrogenChargerService:
             limit=limit,
             offset=offset,
         )
+
+    async def update_charger(self, hydrogen_charger_id: int, payload: HydrogenChargerUpdate):
+        if payload.hydrogen_pressure_bar is not None and payload.hydrogen_pressure_bar < 0:
+            raise HTTPException(status_code=400, detail="hydrogen_pressure_bar must be >= 0")
+
+        row = await hydrogen_charger_repo.update_hydrogen_charger(
+            self.db,
+            hydrogen_charger_id=hydrogen_charger_id,
+            hydrogen_station_id=payload.hydrogen_station_id,
+            charger_status=payload.charger_status,
+            charger_type=payload.charger_type,
+            hydrogen_pressure_bar=payload.hydrogen_pressure_bar,
+            pressure_type=payload.pressure_type,
+            restock_schedule=payload.restock_schedule,
+        )
+        if row is None:
+            raise HTTPException(status_code=404, detail="Hydrogen charger not found")
+        return row

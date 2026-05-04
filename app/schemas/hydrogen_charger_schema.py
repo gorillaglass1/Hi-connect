@@ -12,6 +12,15 @@ class HydrogenChargerCreate(BaseModel):
     restock_schedule: datetime | None = None
 
 
+class HydrogenChargerUpdate(BaseModel):
+    hydrogen_station_id: int | None = None
+    charger_status: str | None = None
+    charger_type: str | None = None
+    hydrogen_pressure_bar: int | None = None
+    pressure_type: str | None = None
+    restock_schedule: datetime | None = None
+
+
 class HydrogenChargerResponse(HydrogenChargerCreate):
     hydrogen_charger_id: int
 

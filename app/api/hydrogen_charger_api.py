@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.schemas.hydrogen_charger_schema import HydrogenChargerCreate, HydrogenChargerResponse
+from app.schemas.hydrogen_charger_schema import (
+    HydrogenChargerCreate,
+    HydrogenChargerResponse,
+    HydrogenChargerUpdate,
+)
 from app.services.hydrogen_charger_service import HydrogenChargerService
 
 router = APIRouter(prefix="/hydrogen-chargers", tags=["hydrogen-chargers"])
@@ -31,3 +35,12 @@ async def list_chargers(
         limit,
         offset,
     )
+
+
+@router.patch("/{hydrogen_charger_id}", response_model=HydrogenChargerResponse)
+async def update_charger(
+    hydrogen_charger_id: int,
+    payload: HydrogenChargerUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    return await HydrogenChargerService(db).update_charger(hydrogen_charger_id, payload)

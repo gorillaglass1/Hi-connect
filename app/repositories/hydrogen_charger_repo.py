@@ -56,3 +56,40 @@ async def get_hydrogen_chargers(
     query = query.order_by(hydrogen_charger.hydrogen_charger_id.desc()).limit(limit).offset(offset)
     result = await db.execute(query)
     return result.scalars().all()
+
+
+async def update_hydrogen_charger(
+    db: AsyncSession,
+    hydrogen_charger_id: int,
+    hydrogen_station_id: int | None = None,
+    charger_status: str | None = None,
+    charger_type: str | None = None,
+    hydrogen_pressure_bar: int | None = None,
+    pressure_type: str | None = None,
+    restock_schedule: datetime | None = None,
+):
+    result = await db.execute(
+        select(hydrogen_charger).where(
+            hydrogen_charger.hydrogen_charger_id == hydrogen_charger_id
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None
+
+    if hydrogen_station_id is not None:
+        row.hydrogen_station_id = hydrogen_station_id
+    if charger_status is not None:
+        row.charger_status = charger_status
+    if charger_type is not None:
+        row.charger_type = charger_type
+    if hydrogen_pressure_bar is not None:
+        row.hydrogen_pressure_bar = hydrogen_pressure_bar
+    if pressure_type is not None:
+        row.pressure_type = pressure_type
+    if restock_schedule is not None:
+        row.restock_schedule = restock_schedule
+
+    await db.commit()
+    await db.refresh(row)
+    return row
