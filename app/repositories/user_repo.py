@@ -44,6 +44,7 @@ async def update_user(
     db: AsyncSession,
     user_id: int,
     name: str | None = None,
+    email: str | None = None,
     phone: str | None = None,
 ):
     result = await db.execute(select(User).where(User.user_id == user_id))
@@ -54,6 +55,8 @@ async def update_user(
 
     if name is not None:
         user.name = name
+    if email is not None:
+        user.email = email
     if phone is not None:
         user.phone = phone
 

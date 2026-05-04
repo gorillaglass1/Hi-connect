@@ -8,9 +8,9 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str | None = None
     phone: str | None = None
-    email: EmailStr | None = None
 
 
 class UserResponse(UserCreate):

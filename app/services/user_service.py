@@ -1,5 +1,4 @@
 from fastapi import HTTPException
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import user_repo
@@ -57,26 +56,14 @@ class UserService:
         self,
         user_id: int,
         name: str | None = None,
-        email: str | None = None,
         phone: str | None = None,
     ):
-        if email is not None:
-            existing_users = await user_repo.get_users(self.db, email=email, limit=1)
-            existing_user = existing_users[0] if existing_users else None
-            if existing_user is not None and existing_user.user_id != user_id:
-                raise HTTPException(status_code=409, detail="Email already exists")
-
-        try:
-            user = await user_repo.update_user(
-                self.db,
-                user_id=user_id,
-                name=name,
-                email=email,
-                phone=phone,
-            )
-        except IntegrityError:
-            await self.db.rollback()
-            raise HTTPException(status_code=409, detail="Email already exists")
+        user = await user_repo.update_user(
+            self.db,
+            user_id=user_id,
+            name=name,
+            phone=phone,
+        )
 
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
