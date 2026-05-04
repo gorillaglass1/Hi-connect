@@ -14,7 +14,7 @@
 git clone https://github.com/gorillaglass1/Hi-connect.git
 cd Hi-connect
 
-# 가상환경 생성 (Python 3.10 이상 권장)
+# 가상환경 생성 (Python 3.10 이상 권장) -- Pycharm 사용시 자동 생성할 수 있음
 python -m venv .venv
 
 # 가상환경 활성화

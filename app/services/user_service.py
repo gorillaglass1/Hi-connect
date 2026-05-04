@@ -11,8 +11,7 @@ class UserService:
         self.db = db
 
     async def create_user(self, user: UserCreate):
-        existing_users = await user_repo.get_users(self.db, email=user.email, limit=1)
-        existing_user = existing_users[0] if existing_users else None
+        existing_user = await user_repo.get_user_by_email(self.db, user.email)
         if existing_user is not None:
             raise HTTPException(status_code=409, detail="Email already exists")
 
@@ -28,6 +27,5 @@ class UserService:
             raise HTTPException(status_code=409, detail="Email already exists")
 
     async def find_user_by_id(self, user_id: int):
-        users = await user_repo.get_users(self.db, user_id=user_id, limit=1)
-        user = users[0] if users else None
+        user = await user_repo.get_user_by_id(self.db, user_id)
         return {"user": user}

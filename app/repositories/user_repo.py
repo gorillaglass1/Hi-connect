@@ -12,29 +12,11 @@ async def create_user(db: AsyncSession, name: str, email: str, phone: str):
     return new_user
 
 
-async def get_users(
-    db: AsyncSession,
-    user_id: int | None = None,
-    email: str | None = None,
-    name: str | None = None,
-    phone: str | None = None,
-    limit: int = 100,
-    offset: int = 0,
-):
-    query = select(User)
+async def get_user_by_id(db: AsyncSession, user_id: int):
+    result = await db.execute(select(User).where(User.user_id == user_id))
+    return result.scalars().first()
 
-    if user_id is not None:
-        query = query.where(User.user_id == user_id)
 
-    if email:
-        query = query.where(User.email == email)
-
-    if name:
-        query = query.where(User.name == name)
-
-    if phone:
-        query = query.where(User.phone == phone)
-
-    query = query.order_by(User.user_id.desc()).limit(limit).offset(offset)
-    result = await db.execute(query)
-    return result.scalars().all()
+async def get_user_by_email(db: AsyncSession, email: str):
+    result = await db.execute(select(User).where(User.email == email))
+    return result.scalars().first()
