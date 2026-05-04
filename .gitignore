@@ -31,3 +31,5 @@ build/
 # SQLite local DB files
 *.db
 *.sqlite3
+
+guide.md

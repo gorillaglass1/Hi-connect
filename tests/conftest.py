@@ -39,6 +39,7 @@ async def db_session(engine) -> AsyncSession:
         class_=AsyncSession,
         autocommit=False,
         autoflush=False,
+        expire_on_commit=False,
     )
     async with session_factory() as session:
         yield session
