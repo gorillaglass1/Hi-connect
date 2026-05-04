@@ -3,18 +3,19 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
-class Create_charging_log(BaseModel):
+class ChargingLogCreate(BaseModel):
     user_id: int
     hydrogen_station_id: int
     vehicle_id: int
     start_time: datetime
     end_time: datetime
-    charged_amount: float | None
-    charging_cost: float | None
-    waiting_time: int | None
+    charged_amount: float | None = None
+    charging_cost: float | None = None
+    waiting_time: int | None = None
 
-class charging_log_schemas_Response(BaseModel):
+
+class ChargingLogResponse(ChargingLogCreate):
     charging_log_id: int
-    updated_at: datetime | None = None
-    model_config = ConfigDict(from_attributes=True)
+    created_at: datetime | None = None
 
+    model_config = ConfigDict(from_attributes=True)

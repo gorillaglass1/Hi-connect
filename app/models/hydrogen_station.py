@@ -2,7 +2,7 @@ from contextlib import nullcontext
 from decimal import Decimal
 
 
-from sqlalchemy import Column, Integer, String, TIMESTAMP, func
+from sqlalchemy import Column, Integer, String, TIMESTAMP, func, TIME
 
 from app.core.database import Base
 

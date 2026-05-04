@@ -1,11 +1,9 @@
 from datetime import datetime
 
-from pydantic import ConfigDict
-
-from core.database import Base
+from pydantic import BaseModel, ConfigDict
 
 
-class Create_hydrogen_station_realtime(Base):
+class HydrogenStationRealtimeCreate(BaseModel):
     hydrogen_station_id: int
     available_chargers: int = 0
     in_use_chargers: int = 0
@@ -18,7 +16,8 @@ class Create_hydrogen_station_realtime(Base):
     utilization_rate: float | None = None
 
 
-class hydrogen_station_realtime_Response(Create_hydrogen_station_realtime):
+class HydrogenStationRealtimeResponse(HydrogenStationRealtimeCreate):
     realtime_id: int
     updated_at: datetime | None = None
+
     model_config = ConfigDict(from_attributes=True)
