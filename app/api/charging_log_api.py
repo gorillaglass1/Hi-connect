@@ -8,7 +8,7 @@ from app.services.charging_log_service import ChargingLogService
 router = APIRouter(prefix="/charging-logs", tags=["charging-logs"])
 
 
-@router.post("", response_model=ChargingLogResponse)
+@router.post("", response_model=ChargingLogResponse, status_code=201)
 async def create_charging_log(payload: ChargingLogCreate, db: AsyncSession = Depends(get_db)):
     return await ChargingLogService(db).create_charging_log(payload)
 

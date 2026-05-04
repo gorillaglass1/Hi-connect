@@ -11,7 +11,7 @@ from app.services.recommendation_history_service import RecommendationHistorySer
 router = APIRouter(prefix="/recommendation-histories", tags=["recommendation-histories"])
 
 
-@router.post("", response_model=RecommendationHistoryResponse)
+@router.post("", response_model=RecommendationHistoryResponse, status_code=201)
 async def create_recommendation_history(
     payload: RecommendationHistoryCreate,
     db: AsyncSession = Depends(get_db),

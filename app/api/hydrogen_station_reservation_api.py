@@ -15,7 +15,7 @@ from app.services.hydrogen_station_reservation_service import (
 router = APIRouter(prefix="/hydrogen-station-reservations", tags=["hydrogen-station-reservations"])
 
 
-@router.post("", response_model=HydrogenStationReservationResponse)
+@router.post("", response_model=HydrogenStationReservationResponse, status_code=201)
 async def create_reservation(
     payload: HydrogenStationReservationCreate,
     db: AsyncSession = Depends(get_db),

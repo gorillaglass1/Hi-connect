@@ -8,7 +8,7 @@ from app.services.user_service import UserService
 router = APIRouter(prefix="/user", tags=["user"])
 
 
-@router.post("/signup", response_model=UserResponse)
+@router.post("/signup", response_model=UserResponse, status_code=201)
 async def signup_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     service = UserService(db)
     return await service.create_user(user)

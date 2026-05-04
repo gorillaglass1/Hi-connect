@@ -8,7 +8,7 @@ from app.services.hydrogen_station_service import HydrogenStationService
 router = APIRouter(prefix="/hydrogen-stations", tags=["hydrogen-stations"])
 
 
-@router.post("", response_model=HydrogenStationResponse)
+@router.post("", response_model=HydrogenStationResponse, status_code=201)
 async def create_station(payload: HydrogenStationCreate, db: AsyncSession = Depends(get_db)):
     return await HydrogenStationService(db).create_station(payload)
 

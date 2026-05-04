@@ -8,7 +8,7 @@ from app.services.hydrogen_charger_service import HydrogenChargerService
 router = APIRouter(prefix="/hydrogen-chargers", tags=["hydrogen-chargers"])
 
 
-@router.post("", response_model=HydrogenChargerResponse)
+@router.post("", response_model=HydrogenChargerResponse, status_code=201)
 async def create_charger(payload: HydrogenChargerCreate, db: AsyncSession = Depends(get_db)):
     return await HydrogenChargerService(db).create_charger(payload)
 

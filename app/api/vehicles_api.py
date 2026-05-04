@@ -8,7 +8,7 @@ from app.services.vehicle_service import VehicleService
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
 
-@router.post("", response_model=VehicleResponse)
+@router.post("", response_model=VehicleResponse, status_code=201)
 async def create_vehicle(payload: VehicleCreate, db: AsyncSession = Depends(get_db)):
     return await VehicleService(db).create_vehicle(payload)
 

@@ -11,7 +11,7 @@ from app.services.hydrogen_station_realtime_service import HydrogenStationRealti
 router = APIRouter(prefix="/hydrogen-station-realtime", tags=["hydrogen-station-realtime"])
 
 
-@router.post("", response_model=HydrogenStationRealtimeResponse)
+@router.post("", response_model=HydrogenStationRealtimeResponse, status_code=201)
 async def upsert_station_realtime(
     payload: HydrogenStationRealtimeCreate,
     db: AsyncSession = Depends(get_db),
