@@ -38,7 +38,7 @@ def test_create_reservation_success(client):
         },
     )
 
-    assert res.status_code == 200
+    assert res.status_code == 201
 
 
 def test_create_reservation_invalid_time_returns_400(client):

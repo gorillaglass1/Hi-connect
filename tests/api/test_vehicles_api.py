@@ -18,7 +18,7 @@ def test_create_vehicle_success(client):
     }
     res = client.post("/vehicles", json=payload)
 
-    assert res.status_code == 200
+    assert res.status_code == 201
     assert res.json()["vehicle_number"] == payload["vehicle_number"]
 
 

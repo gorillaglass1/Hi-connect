@@ -37,7 +37,7 @@ def test_create_recommendation_history_success(client):
         },
     )
 
-    assert res.status_code == 200
+    assert res.status_code == 201
 
 
 def test_list_recommendation_histories_success(client):

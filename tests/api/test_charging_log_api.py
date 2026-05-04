@@ -41,7 +41,7 @@ def test_create_charging_log_success(client):
         },
     )
 
-    assert res.status_code == 200
+    assert res.status_code == 201
 
 
 def test_create_charging_log_invalid_time_returns_400(client):

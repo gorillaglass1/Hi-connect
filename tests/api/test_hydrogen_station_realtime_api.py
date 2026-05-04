@@ -21,7 +21,7 @@ def test_upsert_station_realtime_success(client):
         },
     )
 
-    assert res.status_code == 200
+    assert res.status_code == 201
     assert res.json()["hydrogen_station_id"] == station["hydrogen_station_id"]
 
 

@@ -19,7 +19,7 @@ def test_create_charger_success(client):
     }
     res = client.post("/hydrogen-chargers", json=payload)
 
-    assert res.status_code == 200
+    assert res.status_code == 201
     assert res.json()["pressure_type"] == "700bar"
 
 

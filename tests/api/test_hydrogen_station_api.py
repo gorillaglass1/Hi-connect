@@ -12,7 +12,7 @@ def test_create_station_success(client):
     }
     res = client.post("/hydrogen-stations", json=payload)
 
-    assert res.status_code == 200
+    assert res.status_code == 201
     assert res.json()["name"] == payload["name"]
 
 
