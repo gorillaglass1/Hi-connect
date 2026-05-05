@@ -8,7 +8,6 @@ INSERT INTO recommendation_history (
     user_longitude,
     vehicle_remaining_hydrogen,
     estimated_arrival_time,
-    estimated_wait_time,
     selected,
     selected_at,
     recommendation_type
@@ -23,7 +22,6 @@ INSERT INTO recommendation_history (
     126.9780000,
     2.80,
     8,
-    5,
     TRUE,
     '2026-04-27 14:12:00',
     'AI'
@@ -38,7 +36,6 @@ INSERT INTO recommendation_history (
     127.1112000,
     1.40,
     12,
-    3,
     FALSE,
     NULL,
     'WAIT_TIME'
@@ -53,7 +50,6 @@ INSERT INTO recommendation_history (
     129.0756000,
     0.95,
     18,
-    10,
     TRUE,
     '2026-04-27 15:45:00',
     'DISTANCE'

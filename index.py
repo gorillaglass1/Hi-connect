@@ -11,6 +11,7 @@ from app.api.recommendation_history_api import router as recommendation_history_
 from app.api.user_api import router as user_router
 from app.api.vehicles_api import router as vehicles_router
 from app.core.database import Base, engine
+from app.core.dummy_data_loader import load_dummy_data_from_dml
 from app.core.security import enforce_api_key_if_configured
 from app.core.sql_bootstrap import run_startup_sql
 from app.models.charging_log import ChargingLog  # noqa: F401
@@ -27,6 +28,7 @@ async def lifespan(_: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await run_startup_sql(engine)
+    await load_dummy_data_from_dml(engine)
     yield
 
 

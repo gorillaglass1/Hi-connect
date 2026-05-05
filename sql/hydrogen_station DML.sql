@@ -4,8 +4,8 @@ INSERT INTO hydrogen_station (
     latitude,
     longitude,
     contact_number,
-    start_hour,
-    end_hour,
+    start_time,
+    end_time,
     total_chargers,
     payment_supported
 )

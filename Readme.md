@@ -88,6 +88,7 @@ project_root/
 코드 수정 후에는 아래 명령어로 안정성을 확인합니다.
 
 * **서버 실행**: `uvicorn index:app --reload`
+  * 더미 DML 자동 주입이 필요하면 실행 전에 `ENABLE_STARTUP_DUMMY_DATA=true` 설정
 * **테스트 실행**: `pytest -q`
 * **API 문서 확인**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
@@ -99,4 +100,3 @@ project_root/
 * **Import 주의**: `index.py`에서 `Base.metadata.create_all`이 동작하려면 새로운 모델 추가 시 반드시 `index.py` 상단에서 해당 모델을 import해줘야 합니다.
 
 ---
-

@@ -17,6 +17,7 @@ async def create_charging_log(payload: ChargingLogCreate, db: AsyncSession = Dep
 async def list_charging_logs(
     charging_log_id: int | None = None,
     user_id: int | None = None,
+    station_id: int | None = None,
     hydrogen_station_id: int | None = None,
     vehicle_id: int | None = None,
     limit: int = Query(default=100, ge=1, le=1000),
@@ -26,7 +27,7 @@ async def list_charging_logs(
     return await ChargingLogService(db).get_charging_logs(
         charging_log_id,
         user_id,
-        hydrogen_station_id,
+        station_id or hydrogen_station_id,
         vehicle_id,
         limit,
         offset,

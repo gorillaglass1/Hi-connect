@@ -27,7 +27,9 @@ async def create_reservation(
 @router.get("", response_model=list[HydrogenStationReservationResponse])
 async def list_reservations(
     hydrogen_station_reservation_id: int | None = None,
+    charger_id: int | None = None,
     hydrogen_charger_id: int | None = None,
+    station_id: int | None = None,
     hydrogen_station_id: int | None = None,
     user_id: int | None = None,
     reservation_status: str | None = None,
@@ -39,8 +41,8 @@ async def list_reservations(
 ):
     return await HydrogenStationReservationService(db).get_reservations(
         hydrogen_station_reservation_id,
-        hydrogen_charger_id,
-        hydrogen_station_id,
+        charger_id or hydrogen_charger_id,
+        station_id or hydrogen_station_id,
         user_id,
         reservation_status,
         reservation_time,

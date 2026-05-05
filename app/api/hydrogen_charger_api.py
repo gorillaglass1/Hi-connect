@@ -19,7 +19,9 @@ async def create_charger(payload: HydrogenChargerCreate, db: AsyncSession = Depe
 
 @router.get("", response_model=list[HydrogenChargerResponse])
 async def list_chargers(
+    charger_id: int | None = None,
     hydrogen_charger_id: int | None = None,
+    station_id: int | None = None,
     hydrogen_station_id: int | None = None,
     charger_status: str | None = None,
     pressure_type: str | None = None,
@@ -27,17 +29,27 @@ async def list_chargers(
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    return await HydrogenChargerService(db).get_chargers(
-        hydrogen_charger_id,
-        hydrogen_station_id,
-        charger_status,
-        pressure_type,
-        limit,
-        offset,
+    service = HydrogenChargerService(db)
+    return await service.get_chargers(
+        hydrogen_charger_id=charger_id or hydrogen_charger_id,
+        hydrogen_station_id=station_id or hydrogen_station_id,
+        charger_status=charger_status,
+        pressure_type=pressure_type,
+        limit=limit,
+        offset=offset,
     )
 
 
-@router.patch("/{hydrogen_charger_id}", response_model=HydrogenChargerResponse)
+@router.get("/{hydrogen_station_id}", response_model=list[HydrogenChargerResponse])
+async def list_chargers_by_station(
+    hydrogen_station_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    service = HydrogenChargerService(db)
+    return await service.get_chargers(hydrogen_station_id=hydrogen_station_id)
+
+
+@router.patch("/update/{hydrogen_charger_id}", response_model=HydrogenChargerResponse)
 async def update_charger(
     hydrogen_charger_id: int,
     payload: HydrogenChargerUpdate,

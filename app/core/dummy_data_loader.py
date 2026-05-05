@@ -1,47 +1,45 @@
 from __future__ import annotations
 
-from pathlib import Path
 import logging
+import os
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.core.sql_bootstrap import _normalize_sql_for_sqlite, _split_sql_statements
+
 logger = logging.getLogger(__name__)
 
-
-def _split_sql_statements(sql_text: str) -> list[str]:
-    statements: list[str] = []
-    for chunk in sql_text.split(";"):
-        line_joined = "\n".join(
-            line for line in chunk.splitlines() if not line.strip().startswith("--")
-        ).strip()
-        if line_joined:
-            statements.append(line_joined)
-    return statements
+ENABLE_DUMMY_DATA_ENV = "ENABLE_STARTUP_DUMMY_DATA"
 
 
-def _normalize_sql_for_sqlite(statement: str) -> str:
-    normalized = statement
-    normalized = normalized.replace("start_hour", "start_time")
-    normalized = normalized.replace("end_hour", "end_time")
-    return normalized
+def _is_enabled() -> bool:
+    value = os.getenv(ENABLE_DUMMY_DATA_ENV, "false").strip().lower()
+    return value in {"1", "true", "yes", "on"}
 
 
-async def run_startup_sql(engine: AsyncEngine, sql_dir: str = "sql") -> None:
+async def load_dummy_data_from_dml(engine: AsyncEngine, sql_dir: str = "sql") -> None:
+    if not _is_enabled():
+        logger.info("%s is disabled. Skipping DML dummy data load.", ENABLE_DUMMY_DATA_ENV)
+        return
+
     base_path = Path(sql_dir)
     if not base_path.exists():
         return
 
-    files = sorted([p for p in base_path.iterdir() if p.is_file()])
-    ddl_files = [p for p in files if p.name.lower().endswith("ddl.sql")]
-    run_files = ddl_files
+    dml_files = sorted(
+        [p for p in base_path.iterdir() if p.is_file() and p.name.lower().endswith("dml.sql")]
+    )
+    if not dml_files:
+        return
 
     async with engine.begin() as conn:
         await conn.execute(
             text(
                 """
-                CREATE TABLE IF NOT EXISTS _ddl_bootstrap_runs (
+                CREATE TABLE IF NOT EXISTS _dml_bootstrap_runs (
                     file_name TEXT PRIMARY KEY,
                     executed_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
@@ -49,10 +47,10 @@ async def run_startup_sql(engine: AsyncEngine, sql_dir: str = "sql") -> None:
             )
         )
 
-        for sql_file in run_files:
+        for sql_file in dml_files:
             already_run = await conn.execute(
                 text(
-                    "SELECT 1 FROM _ddl_bootstrap_runs WHERE file_name = :file_name LIMIT 1"
+                    "SELECT 1 FROM _dml_bootstrap_runs WHERE file_name = :file_name LIMIT 1"
                 ),
                 {"file_name": sql_file.name},
             )
@@ -69,14 +67,14 @@ async def run_startup_sql(engine: AsyncEngine, sql_dir: str = "sql") -> None:
                     await conn.execute(text(executable))
                 except SQLAlchemyError as exc:
                     logger.warning(
-                        "Skipping startup SQL statement from %s due to error: %s",
+                        "Skipping dummy DML statement from %s due to error: %s",
                         sql_file.name,
                         exc,
                     )
 
             await conn.execute(
                 text(
-                    "INSERT INTO _ddl_bootstrap_runs (file_name) VALUES (:file_name)"
+                    "INSERT INTO _dml_bootstrap_runs (file_name) VALUES (:file_name)"
                 ),
                 {"file_name": sql_file.name},
             )
