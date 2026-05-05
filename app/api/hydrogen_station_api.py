@@ -36,12 +36,6 @@ async def list_stations(
         offset,
     )
 
-
-@router.get("/{hydrogen_station_id}", response_model=HydrogenStationResponse)
-async def get_station(hydrogen_station_id: int, db: AsyncSession = Depends(get_db)):
-    return await HydrogenStationService(db).get_station_by_id(hydrogen_station_id)
-
-
 @router.patch("/{hydrogen_station_id}", response_model=HydrogenStationResponse)
 async def update_station(
     hydrogen_station_id: int,

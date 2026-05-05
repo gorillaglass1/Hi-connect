@@ -7,7 +7,7 @@ def test_create_user_success(client):
     }
 
 
-    res = client.post("/user/signup", json=payload)
+    res = client.post("/user", json=payload)
 
 
     assert res.status_code == 201

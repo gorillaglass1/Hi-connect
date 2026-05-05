@@ -40,15 +40,6 @@ async def list_chargers(
     )
 
 
-@router.get("/{hydrogen_station_id}", response_model=list[HydrogenChargerResponse])
-async def list_chargers_by_station(
-    hydrogen_station_id: int,
-    db: AsyncSession = Depends(get_db),
-):
-    service = HydrogenChargerService(db)
-    return await service.get_chargers(hydrogen_station_id=hydrogen_station_id)
-
-
 @router.patch("/update/{hydrogen_charger_id}", response_model=HydrogenChargerResponse)
 async def update_charger(
     hydrogen_charger_id: int,

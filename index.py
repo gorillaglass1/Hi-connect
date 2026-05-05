@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from starlette.responses import FileResponse
 
 from app.api.charging_log_api import router as charging_log_router
 from app.api.hydrogen_charger_api import router as hydrogen_charger_router
@@ -50,5 +51,7 @@ async def api_key_guard(request: Request, call_next):
 
 
 @app.get("/")
-async def root():
-    return {"message": "Hello World"}
+async def mainPage():
+    return FileResponse("app/src/index.html")
+
+

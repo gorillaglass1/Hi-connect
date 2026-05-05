@@ -15,8 +15,8 @@ async def create_vehicle(payload: VehicleCreate, db: AsyncSession = Depends(get_
 
 @router.get("", response_model=list[VehicleResponse])
 async def list_vehicles(
+    user_id: int,
     vehicle_id: int | None = None,
-    user_id: int | None = None,
     vehicle_number: str | None = None,
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
