@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hy-Connect | 연결 그 이상의 가치</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap');
+
+        :root {
+            --bg-black: #000000;
+            --bg-deep: #050505;
+            --soft-blue: #60a5fa;
+            --apple-gray: #86868b;
+            --text-white: #f5f5f7;
+            --card-glass: rgba(28, 28, 30, 0.7);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-black);
+            color: var(--text-white);
+            font-family: 'Pretendard', sans-serif;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Hero Section */
+        .hero {
+            height: 400vh;
+            position: relative;
+        }
+
+        .hero-sticky {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .hero-title {
+            text-align: center;
+            z-index: 10;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .hero-title h1 {
+            font-size: clamp(3rem, 10vw, 8rem);
+            font-weight: 900;
+            background: linear-gradient(180deg, #fff 0%, #86868b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.1;
+        }
+
+        .main-slogan {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            width: 100%;
+            opacity: 0;
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        .main-slogan h2 {
+            font-size: clamp(2rem, 6vw, 4.5rem);
+            font-weight: 800;
+            line-height: 1.3;
+        }
+
+        .main-slogan span {
+            color: var(--soft-blue);
+        }
+
+        .hero-title p {
+            font-size: 1.5rem;
+            margin-top: 20px;
+            color: var(--soft-blue);
+            letter-spacing: 0.1em;
+            font-weight: 600;
+        }
+
+        /* Car Image Placeholder */
+        .hero-car-wrapper {
+            position: absolute;
+            width: 90%;
+            max-width: 1200px;
+            transform: scale(1.5) translateY(300px);
+            opacity: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .visual-placeholder {
+            width: 100%;
+            height: 400px;
+            background: linear-gradient(90deg, transparent 0%, rgba(96, 165, 250, 0.1) 50%, transparent 100%);
+            border-radius: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            box-shadow: 0 0 100px rgba(96, 165, 250, 0.1);
+        }
+
+        /* Section Styling */
+        .section {
+            padding: 160px 10%;
+            position: relative;
+        }
+
+        .apple-headline {
+            font-size: clamp(2.5rem, 5vw, 4.5rem);
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 40px;
+            text-align: center;
+            letter-spacing: -0.02em;
+        }
+
+        .apple-subheadline {
+            font-size: 1.5rem;
+            color: var(--apple-gray);
+            max-width: 900px;
+            margin: 0 auto 80px;
+            text-align: center;
+            line-height: 1.5;
+            font-weight: 500;
+        }
+
+        /* Bento Grid */
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-rows: repeat(2, 450px);
+            gap: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .bento-item {
+            background: var(--card-glass);
+            backdrop-filter: blur(20px);
+            border-radius: 34px;
+            padding: 50px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: transform 0.5s cubic-bezier(0.2, 0, 0.2, 1);
+        }
+
+        .bento-item:hover {
+            transform: scale(1.02);
+        }
+
+        .bento-1 {
+            grid-column: span 8;
+        }
+
+        .bento-2 {
+            grid-column: span 4;
+        }
+
+        .bento-3 {
+            grid-column: span 4;
+        }
+
+        .bento-4 {
+            grid-column: span 8;
+        }
+
+        .bento-item h3 {
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .bento-item p {
+            font-size: 1.2rem;
+            color: var(--apple-gray);
+            line-height: 1.6;
+        }
+
+        .bento-icon {
+            font-size: 3.5rem;
+            color: var(--soft-blue);
+            margin-bottom: 30px;
+            display: block;
+        }
+
+        /* Feature Highlight */
+        .highlight-container {
+            display: flex;
+            align-items: center;
+            gap: 80px;
+            margin-top: 100px;
+        }
+
+        .feature-image-placeholder {
+            flex: 1.2;
+            height: 500px;
+            background: #1c1c1e;
+            border-radius: 40px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .ui-mockup {
+            width: 80%;
+            height: 60%;
+            background: #000;
+            border-radius: 20px;
+            border: 4px solid #333;
+            position: relative;
+            padding: 20px;
+        }
+
+        .ui-line {
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            width: 100%;
+        }
+
+        .ui-line.short {
+            width: 60%;
+        }
+
+        .ui-line.blue {
+            background: var(--soft-blue);
+            width: 40%;
+        }
+
+        .feature-text {
+            flex: 1;
+        }
+
+        .feature-text h2 {
+            font-size: 3.5rem;
+            margin-bottom: 30px;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        /* Vision Icons */
+        .vision-item {
+            width: 280px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 30px;
+            transition: 0.3s;
+        }
+
+        .vision-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .vision-item h4 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        /* Footer */
+        .cta-section {
+            text-align: center;
+            padding: 240px 10%;
+            background: var(--bg-deep);
+        }
+
+        .btn-apple {
+            background: var(--text-white);
+            color: var(--bg-black);
+            padding: 22px 60px;
+            border-radius: 45px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-block;
+            transition: 0.4s cubic-bezier(0.2, 0, 0.2, 1);
+        }
+
+        .btn-apple:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 40px rgba(255, 255, 255, 0.2);
+        }
+
+        /* SVG Car Shape */
+        .car-svg {
+            width: 80%;
+            fill: none;
+            stroke: var(--soft-blue);
+            stroke-width: 1;
+            opacity: 0.4;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Hero Section -->
+    <div class="hero">
+        <div class="hero-sticky">
+            <!-- Initial Title -->
+            <div class="hero-title" id="initialTitle">
+                <p>HYUNDAI x PLEOS</p>
+                <h1 id="heroH1">Hy-Connect</h1>
+            </div>
+
+            <!-- Main Slogan (Appears on Scroll) -->
+            <div class="main-slogan" id="sloganText">
+                <h2>도착하니 충전불가?<br><span>그런 일은 없습니다.</span></h2>
+            </div>
+
+            <!-- Car Visual -->
+            <div class="hero-car-wrapper" id="heroCar">
+                <div class="visual-placeholder">
+                    <svg class="car-svg" viewBox="0 0 800 300">
+                        <path d="M50,200 L150,190 L200,100 L500,90 L650,180 L750,195 L750,240 L50,240 Z"
+                            stroke-dasharray="1000" stroke-dashoffset="1000" id="carPath">
+                            <animate attributeName="stroke-dashoffset" from="1000" to="0" dur="3s" fill="freeze" />
+                        </path>
+                        <circle cx="180" cy="240" r="35" stroke="currentColor" />
+                        <circle cx="620" cy="240" r="35" stroke="currentColor" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Intro Text -->
+    <section class="section">
+        <h2 class="apple-headline">모든 여정의<br>완벽한 결론.</h2>
+        <p class="apple-subheadline">수소차 오너의 불안은 기술의 부재가 아닌, 연결의 부재에서 옵니다. 우리는 차량의 심장과 도로의 데이터를 하나로 묶어 이전에 없던 확신을 제공합니다.
+        </p>
+    </section>
+
+    <!-- Bento Grid Tech -->
+    <section class="section" style="background-color: var(--bg-deep);">
+        <h2 class="apple-headline" style="text-align: left; margin-left: 20px; margin-bottom: 60px;">보이지 않는
+            곳에서,<br><span style="color:var(--soft-blue)">우리는 빛납니다.</span></h2>
+        <div class="bento-grid">
+            <div class="bento-item bento-1">
+                <i class="fa-solid fa-microchip bento-icon"></i>
+                <h3>대기열 예측 알고리즘</h3>
+                <p>단순한 충전소 위치 안내를 넘어, 실시간 대기 차량 수와 충전 속도를 연산하여 실제 충전이 가능한 시간을 1분 단위로 예측합니다.</p>
+            </div>
+            <div class="bento-item bento-2" style="background: linear-gradient(135deg, #1e3a8a, #000);">
+                <i class="fa-solid fa-tower-broadcast bento-icon" style="color: white;"></i>
+                <h3>99.9% 연결성</h3>
+                <p>현대자동차 Pleos SDK와 1:1 동기화되어 가장 정확한 차량 데이터를 수집합니다.</p>
+            </div>
+            <div class="bento-item bento-3">
+                <i class="fa-solid fa-bolt-lightning bento-icon"></i>
+                <h3>실시간 데이터 스트리밍</h3>
+                <p>전국 충전소의 실시간 상태 변화를 초단위로 수신하여, 갑작스러운 충전기 고장이나 운영 중단에 즉각적으로 대응합니다.</p>
+            </div>
+            <div class="bento-item bento-4">
+                <i class="fa-solid fa-truck-moving bento-icon"></i>
+                <h3>XCIENT 상용차 최적화</h3>
+                <p>물류 현장의 핵심인 엑시언트 수소트럭을 위해, 화물차 전용 진입로가 확보된 충전소와 대형 차량 전용 대기열 정보를 우선적으로 제공합니다.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Feature Highlight -->
+    <section class="section">
+        <div class="highlight-container">
+            <div class="feature-text">
+                <h2>완벽한 조화.</h2>
+                <p class="apple-subheadline" style="text-align: left; margin-left: 0; margin-bottom: 40px;">현대자동차 순정
+                    내비게이션 UI에 녹아든 Hy-Connect는 별도의 조작 없이도 당신의 경로 위에 최적의 충전 솔루션을 조용히 제시합니다.</p>
+                <ul style="list-style: none; color: var(--apple-gray); font-size: 1.3rem; font-weight: 500;">
+                    <li style="margin-bottom: 20px; display: flex; align-items: center;">
+                        <i class="fa-solid fa-circle-check"
+                            style="color: var(--soft-blue); margin-right: 15px; font-size: 1.5rem;"></i> 잔여 연료 기반 자동 팝업
+                        알림
+                    </li>
+                    <li style="margin-bottom: 20px; display: flex; align-items: center;">
+                        <i class="fa-solid fa-circle-check"
+                            style="color: var(--soft-blue); margin-right: 15px; font-size: 1.5rem;"></i> 경로상 최단 대기 시간
+                        충전소 우선 배치
+                    </li>
+                </ul>
+            </div>
+            <div class="feature-image-placeholder">
+                <div class="ui-mockup">
+                    <div class="ui-line"></div>
+                    <div class="ui-line short"></div>
+                    <div style="margin-top: 40px;">
+                        <div class="ui-line blue"></div>
+                        <p style="font-size: 0.8rem; color: var(--soft-blue);">SMART CHARGE RECOMMENDED</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Vision Section -->
+    <section class="section" style="text-align: center;">
+        <h2 class="apple-headline">수소 그 이상으로.</h2>
+        <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 30px; margin-top: 80px;">
+            <div class="vision-item">
+                <i class="fa-solid fa-battery-full"
+                    style="font-size: 3rem; color: var(--soft-blue); margin-bottom: 25px;"></i>
+                <h4>EV 확장</h4>
+                <p style="font-size: 1.1rem; color: var(--apple-gray);">전기차 충전 정보 통합</p>
+            </div>
+            <div class="vision-item">
+                <i class="fa-solid fa-leaf" style="font-size: 3rem; color: var(--soft-blue); margin-bottom: 25px;"></i>
+                <h4>Eco-System</h4>
+                <p style="font-size: 1.1rem; color: var(--apple-gray);">탄소 배출 절감량 추적</p>
+            </div>
+            <div class="vision-item">
+                <i class="fa-solid fa-earth-asia"
+                    style="font-size: 3rem; color: var(--soft-blue); margin-bottom: 25px;"></i>
+                <h4>Global Standard</h4>
+                <p style="font-size: 1.1rem; color: var(--apple-gray);">글로벌 표준 연동</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <h2 class="apple-headline">당신의 여정,<br>이제 확신으로 채우세요.</h2>
+        <div style="margin-top: 60px;">
+            <a href="#" class="btn-apple">Hy-Connect 경험하기</a>
+        </div>
+        <p
+            style="margin-top: 30px; color: var(--soft-blue); font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em;">
+            지금 바로 현대차 Pleos에서 만나보세요.</p>
+    </section>
+
+    <script>
+        gsap.registerPlugin(ScrollTrigger);
+
+        const tl = gsap.timeline({
+            scrollTrigger: {
+                trigger: ".hero",
+                start: "top top",
+                end: "bottom top",
+                scrub: 1
+            }
+        });
+
+        // 1. Fade out initial title
+        tl.to("#initialTitle", { opacity: 0, y: -50, duration: 0.5 });
+
+        // 2. Fade in and out Main Slogan
+        tl.to("#sloganText", { opacity: 1, scale: 1.1, duration: 0.8 })
+            .to("#sloganText", { opacity: 0, scale: 1.2, y: -30, duration: 0.5 });
+
+        // 3. Bring in the car
+        tl.to("#heroCar", {
+            opacity: 1,
+            scale: 0.85,
+            y: -50,
+            duration: 1,
+            ease: "power2.out"
+        }, "-=0.3");
+
+        // Universal Section Fade-In
+        gsap.utils.toArray('.section').forEach(section => {
+            gsap.from(section, {
+                scrollTrigger: {
+                    trigger: section,
+                    start: "top 85%",
+                    toggleActions: "play none none reverse"
+                },
+                opacity: 0,
+                y: 60,
+                duration: 1.2,
+                ease: "expo.out"
+            });
+        });
+
+        // Bento items cascade
+        gsap.utils.toArray('.bento-item').forEach((item, i) => {
+            gsap.from(item, {
+                scrollTrigger: {
+                    trigger: ".bento-grid",
+                    start: "top 75%"
+                },
+                opacity: 0,
+                y: 30,
+                delay: i * 0.15,
+                duration: 1
+            });
+        });
+    </script>
+</body>
+
+</html>
