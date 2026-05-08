@@ -125,12 +125,27 @@ class AlternativeStation(BaseModel):
     reason: str
 
 
+class RecommendedStationOption(BaseModel):
+    rank: int
+    hydrogen_station_id: int
+    name: str
+    address: str
+    latitude: float
+    longitude: float
+    selected_charger_id: int | None = None
+    score: float
+    reason: str
+    highlight: str
+    decision_factors: DecisionFactors
+
+
 class OptimizedStationRecommendationResponse(BaseModel):
     recommendation_id: int
     recommended_station: RecommendedStation
     score: float
     reason: str
     decision_factors: DecisionFactors
+    recommendations: list[RecommendedStationOption]
     alternatives: list[AlternativeStation]
     message_for_driver: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

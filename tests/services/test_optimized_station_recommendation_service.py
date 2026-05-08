@@ -138,10 +138,25 @@ async def test_recommend_selects_best_reachable_open_station():
     response = await OptimizedStationRecommendationService().recommend(payload)
 
     assert response.recommended_station.hydrogen_station_id == 101
+    assert response.recommendations[0].hydrogen_station_id == 101
+    assert len(response.recommendations) == 2
     assert response.recommended_station.selected_charger_id == 1001
     assert response.decision_factors.reachable is True
     assert response.decision_factors.supports_700bar is True
     assert response.alternatives[0].hydrogen_station_id == 102
+
+
+@pytest.mark.asyncio
+async def test_recommend_adds_demo_candidates_when_request_has_one_station():
+    data = optimized_payload()
+    data["candidate_stations"] = data["candidate_stations"][:1]
+    payload = OptimizedStationRecommendationRequest(**data)
+
+    response = await OptimizedStationRecommendationService().recommend(payload)
+
+    assert len(response.recommendations) == 3
+    assert response.recommendations[0].hydrogen_station_id == response.recommended_station.hydrogen_station_id
+    assert {item.hydrogen_station_id for item in response.recommendations} >= {101, 901, 902}
 
 
 @pytest.mark.asyncio
@@ -150,8 +165,19 @@ async def test_recommend_raises_when_no_candidate_available():
     data["candidate_stations"] = [
         {
             **data["candidate_stations"][0],
+            "hydrogen_station_id": 201,
             "distance_from_current_km": 200,
-        }
+        },
+        {
+            **data["candidate_stations"][0],
+            "hydrogen_station_id": 202,
+            "distance_from_current_km": 210,
+        },
+        {
+            **data["candidate_stations"][0],
+            "hydrogen_station_id": 203,
+            "distance_from_current_km": 220,
+        },
     ]
     payload = OptimizedStationRecommendationRequest(**data)
 

@@ -16,6 +16,7 @@ from app.schemas.optimized_station_recommendation_schema import (
     OptimizedStationRecommendationResponse,
     RecommendedStation,
     AlternativeStation,
+    RecommendedStationOption,
 )
 
 
@@ -35,13 +36,16 @@ class OptimizedStationRecommendationService:
         self,
         payload: OptimizedStationRecommendationRequest,
     ) -> OptimizedStationRecommendationResponse:
+        payload = self._with_demo_candidates(payload)
         scored = self._score_candidates(payload)
         if not scored:
             raise ValueError("추천 가능한 충전소 후보가 없습니다.")
 
         top_candidates = scored[:5]
-        best = top_candidates[0]
         gemini_text = await self._generate_gemini_text(payload, top_candidates)
+        best = self._select_ai_recommended_candidate(top_candidates, gemini_text)
+        ranked_candidates = [best] + [item for item in top_candidates if item is not best]
+        ranked_candidates = ranked_candidates[:3]
 
         reason = gemini_text.reason or best.reason
         message = gemini_text.message_for_driver or self._default_driver_message(best)
@@ -59,6 +63,22 @@ class OptimizedStationRecommendationService:
             score=best.score,
             reason=reason,
             decision_factors=self._decision_factors(best),
+            recommendations=[
+                RecommendedStationOption(
+                    rank=index + 1,
+                    hydrogen_station_id=item.station.hydrogen_station_id,
+                    name=item.station.name,
+                    address=item.station.address,
+                    latitude=item.station.latitude,
+                    longitude=item.station.longitude,
+                    selected_charger_id=item.selected_charger_id,
+                    score=item.score,
+                    reason=reason if index == 0 else item.reason,
+                    highlight=self._highlight(item),
+                    decision_factors=self._decision_factors(item),
+                )
+                for index, item in enumerate(ranked_candidates)
+            ],
             alternatives=[
                 AlternativeStation(
                     hydrogen_station_id=item.station.hydrogen_station_id,
@@ -66,10 +86,116 @@ class OptimizedStationRecommendationService:
                     score=item.score,
                     reason=item.reason,
                 )
-                for item in scored[1:4]
+                for item in ranked_candidates[1:]
             ],
             message_for_driver=message,
         )
+
+    def _with_demo_candidates(
+        self,
+        payload: OptimizedStationRecommendationRequest,
+    ) -> OptimizedStationRecommendationRequest:
+        if len(payload.candidate_stations) >= 3:
+            return payload
+
+        existing_ids = {station.hydrogen_station_id for station in payload.candidate_stations}
+        stations = list(payload.candidate_stations)
+        for station in self._demo_candidates():
+            if len(stations) >= 3:
+                break
+            if station.hydrogen_station_id in existing_ids:
+                continue
+            stations.append(station)
+
+        return payload.model_copy(update={"candidate_stations": stations})
+
+    def _demo_candidates(self) -> list[CandidateStation]:
+        return [
+            CandidateStation(
+                hydrogen_station_id=901,
+                name="데모 강동 수소스테이션",
+                address="서울 강동구 데모로 12",
+                latitude=37.5301,
+                longitude=127.1238,
+                distance_from_current_km=14.2,
+                detour_distance_km=4.5,
+                is_on_route=True,
+                price_per_kg=8800,
+                payment_supported="card",
+                realtime={
+                    "available_chargers": 1,
+                    "in_use_chargers": 0,
+                    "queue_count": 1,
+                    "avg_wait_time": 5,
+                    "hydrogen_stock_kg": 80,
+                    "station_status": "OPEN",
+                },
+                chargers=[
+                    {
+                        "hydrogen_charger_id": 9001,
+                        "charger_status": "AVAILABLE",
+                        "hydrogen_pressure_bar": 700,
+                        "pressure_type": "700bar",
+                    }
+                ],
+            ),
+            CandidateStation(
+                hydrogen_station_id=902,
+                name="데모 하남 수소충전소",
+                address="경기 하남시 데모대로 77",
+                latitude=37.545,
+                longitude=127.205,
+                distance_from_current_km=22.5,
+                detour_distance_km=6.8,
+                is_on_route=False,
+                price_per_kg=9700,
+                payment_supported="card",
+                realtime={
+                    "available_chargers": 2,
+                    "in_use_chargers": 0,
+                    "queue_count": 0,
+                    "avg_wait_time": 0,
+                    "hydrogen_stock_kg": 200,
+                    "station_status": "OPEN",
+                },
+                chargers=[
+                    {
+                        "hydrogen_charger_id": 9002,
+                        "charger_status": "AVAILABLE",
+                        "hydrogen_pressure_bar": 350,
+                        "pressure_type": "350bar",
+                    }
+                ],
+            ),
+            CandidateStation(
+                hydrogen_station_id=903,
+                name="데모 판교 수소충전소",
+                address="경기 성남시 분당구 데모길 5",
+                latitude=37.3947,
+                longitude=127.1112,
+                distance_from_current_km=19.1,
+                detour_distance_km=2.8,
+                is_on_route=True,
+                price_per_kg=10100,
+                payment_supported="card,app",
+                realtime={
+                    "available_chargers": 1,
+                    "in_use_chargers": 1,
+                    "queue_count": 2,
+                    "avg_wait_time": 12,
+                    "hydrogen_stock_kg": 140,
+                    "station_status": "OPEN",
+                },
+                chargers=[
+                    {
+                        "hydrogen_charger_id": 9003,
+                        "charger_status": "AVAILABLE",
+                        "hydrogen_pressure_bar": 700,
+                        "pressure_type": "700bar",
+                    }
+                ],
+            ),
+        ]
 
     def _score_candidates(
         self,
@@ -186,6 +312,22 @@ class OptimizedStationRecommendationService:
         except (OSError, URLError, TimeoutError, json.JSONDecodeError, KeyError, ValueError):
             return GeminiRecommendationText()
 
+    def _select_ai_recommended_candidate(
+        self,
+        candidates: list[ScoredStation],
+        gemini_text: GeminiRecommendationText,
+    ) -> ScoredStation:
+        if gemini_text.recommended_station_id is None:
+            return candidates[0]
+        return next(
+            (
+                item
+                for item in candidates
+                if item.station.hydrogen_station_id == gemini_text.recommended_station_id
+            ),
+            candidates[0],
+        )
+
     def _call_gemini(self, api_key: str, payload: dict[str, Any]) -> GeminiRecommendationText:
         model = get_gemini_model()
         url = (
@@ -270,6 +412,21 @@ class OptimizedStationRecommendationService:
         if wait_time is not None:
             parts.append(f"예상 대기 시간은 {wait_time}분입니다")
         return ", ".join(parts) + "."
+
+    def _highlight(self, item: ScoredStation) -> str:
+        station = item.station
+        wait_time = self._wait_time(station)
+        if station.realtime and station.realtime.available_chargers > 0 and wait_time is not None and wait_time <= 10:
+            return "대기 시간이 짧음"
+        if station.price_per_kg is not None and station.price_per_kg <= 9900:
+            return "수소 가격이 저렴함"
+        if station.detour_distance_km is not None and station.detour_distance_km <= 3:
+            return "경로 이탈 거리가 짧음"
+        if item.supports_700bar:
+            return "700bar 충전 지원"
+        if station.realtime and station.realtime.hydrogen_stock_kg is not None and station.realtime.hydrogen_stock_kg >= 50:
+            return "수소 재고가 충분함"
+        return "종합 점수가 높음"
 
     def _default_driver_message(self, item: ScoredStation) -> str:
         distance = item.station.distance_from_current_km
