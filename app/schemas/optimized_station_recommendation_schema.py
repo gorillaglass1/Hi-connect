@@ -96,7 +96,7 @@ class OptimizedStationRecommendationRequest(BaseModel):
     navigation: NavigationContext | None = None
     trigger: RecommendationTrigger
     preferences: RecommendationPreferences = Field(default_factory=RecommendationPreferences)
-    candidate_stations: list[CandidateStation]
+    candidate_stations: list[CandidateStation] = Field(default_factory=list)
 
 
 class RecommendedStation(BaseModel):

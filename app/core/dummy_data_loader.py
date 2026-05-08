@@ -29,9 +29,7 @@ async def load_dummy_data_from_dml(engine: AsyncEngine, sql_dir: str = "sql") ->
     if not base_path.exists():
         return
 
-    dml_files = sorted(
-        [p for p in base_path.iterdir() if p.is_file() and p.name.lower().endswith("dml.sql")]
-    )
+    dml_files = _ordered_dml_files(base_path)
     if not dml_files:
         return
 
@@ -78,3 +76,25 @@ async def load_dummy_data_from_dml(engine: AsyncEngine, sql_dir: str = "sql") ->
                 ),
                 {"file_name": sql_file.name},
             )
+
+
+def _ordered_dml_files(base_path: Path) -> list[Path]:
+    files = [
+        p
+        for p in base_path.iterdir()
+        if p.is_file() and p.name.lower().endswith("dml.sql")
+    ]
+    order = {
+        "users dml.sql": 0,
+        "hydrogen_station dml.sql": 1,
+        "vehicles dml.sql": 2,
+        "hydrogen_charger dml.sql": 3,
+        "hydrogen_station_realtime dml.sql": 4,
+        "hydrogen_station_reservation dml.sql": 5,
+        "charging_log dml.sql": 6,
+        "recommendation_history dml.sql": 7,
+    }
+    return sorted(
+        files,
+        key=lambda path: (order.get(path.name.lower(), 100), path.name.lower()),
+    )

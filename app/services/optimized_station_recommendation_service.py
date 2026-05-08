@@ -3,11 +3,19 @@ import json
 import math
 import time
 from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from urllib import request as urllib_request
 from urllib.error import URLError
 
+from sqlalchemy import desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.gemini_config import get_gemini_api_key, get_gemini_model
+from app.models.charging_log import ChargingLog
+from app.models.hydrogen_station import hydrogen_station
+from app.models.recommendation_history import recommendation_history
 from app.schemas.optimized_station_recommendation_schema import (
     CandidateStation,
     DecisionFactors,
@@ -32,6 +40,9 @@ class ScoredStation:
 
 
 class OptimizedStationRecommendationService:
+    def __init__(self, db: AsyncSession | None = None):
+        self.db = db
+
     async def recommend(
         self,
         payload: OptimizedStationRecommendationRequest,
@@ -42,7 +53,8 @@ class OptimizedStationRecommendationService:
             raise ValueError("추천 가능한 충전소 후보가 없습니다.")
 
         top_candidates = scored[:5]
-        gemini_text = await self._generate_gemini_text(payload, top_candidates)
+        user_context = await self._build_user_context(payload)
+        gemini_text = await self._generate_gemini_text(payload, top_candidates, user_context)
         best = self._select_ai_recommended_candidate(top_candidates, gemini_text)
         ranked_candidates = [best] + [item for item in top_candidates if item is not best]
         ranked_candidates = ranked_candidates[:3]
@@ -278,6 +290,7 @@ class OptimizedStationRecommendationService:
         self,
         payload: OptimizedStationRecommendationRequest,
         candidates: list[ScoredStation],
+        user_context: dict[str, Any],
     ) -> GeminiRecommendationText:
         api_key = get_gemini_api_key()
         if api_key is None:
@@ -299,6 +312,7 @@ class OptimizedStationRecommendationService:
                     else None
                 ),
             },
+            "user_context_from_db": user_context,
             "candidates": [self._gemini_candidate(item) for item in candidates],
             "output_format": {
                 "recommended_station_id": "number",
@@ -311,6 +325,143 @@ class OptimizedStationRecommendationService:
             return await asyncio.to_thread(self._call_gemini, api_key, gemini_payload)
         except (OSError, URLError, TimeoutError, json.JSONDecodeError, KeyError, ValueError):
             return GeminiRecommendationText()
+
+    async def _build_user_context(
+        self,
+        payload: OptimizedStationRecommendationRequest,
+    ) -> dict[str, Any]:
+        if self.db is None:
+            return {
+                "recent_charging_logs": [],
+                "pre_charge_states": [],
+                "preferred_stations": [],
+            }
+
+        recent_logs = await self._recent_charging_logs(payload.user_id, payload.vehicle.vehicle_id)
+        pre_charge_states = await self._pre_charge_states(payload.user_id, payload.vehicle.vehicle_id)
+        preferred_stations = await self._preferred_stations(payload.user_id)
+
+        return {
+            "recent_charging_logs": recent_logs,
+            "pre_charge_states": pre_charge_states,
+            "preferred_stations": preferred_stations,
+        }
+
+    async def _recent_charging_logs(self, user_id: int, vehicle_id: int) -> list[dict[str, Any]]:
+        query = (
+            select(ChargingLog, hydrogen_station)
+            .join(
+                hydrogen_station,
+                ChargingLog.hydrogen_station_id == hydrogen_station.hydrogen_station_id,
+            )
+            .where(ChargingLog.user_id == user_id)
+            .where(ChargingLog.vehicle_id == vehicle_id)
+            .order_by(desc(ChargingLog.start_time))
+            .limit(5)
+        )
+        result = await self.db.execute(query)
+        return [
+            {
+                "charging_log_id": log.charging_log_id,
+                "station_id": log.hydrogen_station_id,
+                "station_name": station.name,
+                "charged_amount_kg": self._json_value(log.charged_amount),
+                "charging_cost": self._json_value(log.charging_cost),
+                "waiting_time_min": log.waiting_time,
+                "start_time": self._json_value(log.start_time),
+                "end_time": self._json_value(log.end_time),
+            }
+            for log, station in result.all()
+        ]
+
+    async def _pre_charge_states(self, user_id: int, vehicle_id: int) -> list[dict[str, Any]]:
+        query = (
+            select(recommendation_history, hydrogen_station)
+            .join(
+                hydrogen_station,
+                recommendation_history.hydrogen_station_id
+                == hydrogen_station.hydrogen_station_id,
+            )
+            .where(recommendation_history.user_id == user_id)
+            .where(recommendation_history.vehicle_id == vehicle_id)
+            .where(recommendation_history.vehicle_remaining_hydrogen.is_not(None))
+            .order_by(desc(recommendation_history.recommendation_id))
+            .limit(5)
+        )
+        result = await self.db.execute(query)
+        return [
+            {
+                "recommendation_id": row.recommendation_id,
+                "station_id": row.hydrogen_station_id,
+                "station_name": station.name,
+                "remaining_hydrogen_percent_or_amount": self._json_value(
+                    row.vehicle_remaining_hydrogen
+                ),
+                "user_latitude": self._json_value(row.user_latitude),
+                "user_longitude": self._json_value(row.user_longitude),
+                "selected": row.selected,
+                "created_at": self._json_value(row.created_at),
+            }
+            for row, station in result.all()
+        ]
+
+    async def _preferred_stations(self, user_id: int) -> list[dict[str, Any]]:
+        charging_counts = (
+            select(
+                ChargingLog.hydrogen_station_id.label("station_id"),
+                func.count(ChargingLog.charging_log_id).label("visit_count"),
+            )
+            .where(ChargingLog.user_id == user_id)
+            .group_by(ChargingLog.hydrogen_station_id)
+            .subquery()
+        )
+        selected_counts = (
+            select(
+                recommendation_history.hydrogen_station_id.label("station_id"),
+                func.count(recommendation_history.recommendation_id).label("selected_count"),
+            )
+            .where(recommendation_history.user_id == user_id)
+            .where(recommendation_history.selected.is_(True))
+            .group_by(recommendation_history.hydrogen_station_id)
+            .subquery()
+        )
+        query = (
+            select(
+                hydrogen_station.hydrogen_station_id,
+                hydrogen_station.name,
+                hydrogen_station.address,
+                func.coalesce(charging_counts.c.visit_count, 0).label("visit_count"),
+                func.coalesce(selected_counts.c.selected_count, 0).label("selected_count"),
+            )
+            .outerjoin(
+                charging_counts,
+                hydrogen_station.hydrogen_station_id == charging_counts.c.station_id,
+            )
+            .outerjoin(
+                selected_counts,
+                hydrogen_station.hydrogen_station_id == selected_counts.c.station_id,
+            )
+            .where(
+                (func.coalesce(charging_counts.c.visit_count, 0) > 0)
+                | (func.coalesce(selected_counts.c.selected_count, 0) > 0)
+            )
+            .order_by(
+                desc(func.coalesce(charging_counts.c.visit_count, 0)),
+                desc(func.coalesce(selected_counts.c.selected_count, 0)),
+            )
+            .limit(5)
+        )
+        result = await self.db.execute(query)
+        return [
+            {
+                "station_id": row.hydrogen_station_id,
+                "station_name": row.name,
+                "address": row.address,
+                "visit_count": row.visit_count,
+                "selected_count": row.selected_count,
+            }
+            for row in result.all()
+        ]
 
     def _select_ai_recommended_candidate(
         self,
@@ -367,6 +518,13 @@ class OptimizedStationRecommendationService:
             message_for_driver=parsed.get("message_for_driver"),
             raw=parsed,
         )
+
+    def _json_value(self, value: Any) -> Any:
+        if isinstance(value, Decimal):
+            return float(value)
+        if isinstance(value, datetime):
+            return value.isoformat()
+        return value
 
     def _gemini_candidate(self, item: ScoredStation) -> dict[str, Any]:
         station = item.station

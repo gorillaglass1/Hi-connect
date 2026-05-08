@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import get_db
 from app.schemas.optimized_station_recommendation_schema import (
     OptimizedStationRecommendationRequest,
     OptimizedStationRecommendationResponse,
@@ -16,9 +18,12 @@ router = APIRouter(prefix="/recommendations", tags=["recommendations"])
     response_model=OptimizedStationRecommendationResponse,
     status_code=status.HTTP_200_OK,
 )
-async def recommend_optimized_station(payload: OptimizedStationRecommendationRequest):
+async def recommend_optimized_station(
+    payload: OptimizedStationRecommendationRequest,
+    db: AsyncSession = Depends(get_db),
+):
     try:
-        return await OptimizedStationRecommendationService().recommend(payload)
+        return await OptimizedStationRecommendationService(db).recommend(payload)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

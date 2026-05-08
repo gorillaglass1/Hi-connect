@@ -1,5 +1,10 @@
+from datetime import datetime, timedelta
+
 import pytest
 
+from app.models.charging_log import ChargingLog
+from app.models.hydrogen_station import hydrogen_station
+from app.models.recommendation_history import recommendation_history
 from app.schemas.optimized_station_recommendation_schema import (
     OptimizedStationRecommendationRequest,
 )
@@ -157,6 +162,56 @@ async def test_recommend_adds_demo_candidates_when_request_has_one_station():
     assert len(response.recommendations) == 3
     assert response.recommendations[0].hydrogen_station_id == response.recommended_station.hydrogen_station_id
     assert {item.hydrogen_station_id for item in response.recommendations} >= {101, 901, 902}
+
+
+@pytest.mark.asyncio
+async def test_build_user_context_reads_charging_logs_and_preferences(db_session):
+    station = hydrogen_station(
+        name="사용자 선호 수소충전소",
+        address="서울 테스트구",
+        latitude=37.5,
+        longitude=127.0,
+        total_chargers=2,
+        payment_supported="card",
+    )
+    db_session.add(station)
+    await db_session.commit()
+    await db_session.refresh(station)
+
+    now = datetime(2026, 5, 8, 10, 30)
+    db_session.add(
+        ChargingLog(
+            user_id=1,
+            vehicle_id=1,
+            hydrogen_station_id=station.hydrogen_station_id,
+            start_time=now - timedelta(hours=1),
+            end_time=now,
+            charged_amount=3.2,
+            charging_cost=31000,
+            waiting_time=7,
+        )
+    )
+    db_session.add(
+        recommendation_history(
+            user_id=1,
+            vehicle_id=1,
+            hydrogen_station_id=station.hydrogen_station_id,
+            recommendation_score=88.5,
+            recommendation_reason="테스트 추천",
+            vehicle_remaining_hydrogen=24,
+            selected=True,
+        )
+    )
+    await db_session.commit()
+
+    payload = OptimizedStationRecommendationRequest(**optimized_payload())
+
+    context = await OptimizedStationRecommendationService(db_session)._build_user_context(payload)
+
+    assert context["recent_charging_logs"][0]["station_name"] == "사용자 선호 수소충전소"
+    assert context["recent_charging_logs"][0]["waiting_time_min"] == 7
+    assert context["pre_charge_states"][0]["remaining_hydrogen_percent_or_amount"] == 24.0
+    assert context["preferred_stations"][0]["station_name"] == "사용자 선호 수소충전소"
 
 
 @pytest.mark.asyncio

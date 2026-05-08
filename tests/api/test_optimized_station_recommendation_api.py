@@ -3,7 +3,7 @@ from tests.services.test_optimized_station_recommendation_service import optimiz
 
 def test_recommend_optimized_station_success(client):
     payload = optimized_payload()
-    payload["candidate_stations"] = payload["candidate_stations"][:1]
+    payload.pop("candidate_stations")
 
     res = client.post("/recommendations/optimized-stations", json=payload)
 
