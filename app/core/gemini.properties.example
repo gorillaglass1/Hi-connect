@@ -1,0 +1,4 @@
+# Copy this file to app/core/gemini.properties and set your real key.
+# app/core/gemini.properties is intentionally ignored by git.
+GEMINI_API_KEY=replace-with-your-gemini-api-key
+GEMINI_MODEL=gemini-1.5-flash

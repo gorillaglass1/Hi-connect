@@ -32,4 +32,7 @@ build/
 *.db
 *.sqlite3
 
+# Local secrets
+app/core/gemini.properties
+
 guide.md

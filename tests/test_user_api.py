@@ -5,7 +5,7 @@ def test_signup_user_success(client):
         "email": "seo@example.com",
     }
 
-    response = client.post("/user/signup", json=payload)
+    response = client.post("/user", json=payload)
 
     assert response.status_code == 201
     body = response.json()
@@ -22,10 +22,10 @@ def test_signup_user_duplicate_email_returns_409(client):
         "email": "seo-dup@example.com",
     }
 
-    first_response = client.post("/user/signup", json=payload)
+    first_response = client.post("/user", json=payload)
     assert first_response.status_code == 201
 
-    second_response = client.post("/user/signup", json=payload)
+    second_response = client.post("/user", json=payload)
     assert second_response.status_code == 409
     assert second_response.json()["detail"] == "Email already exists"
 
@@ -37,7 +37,7 @@ def test_signup_user_invalid_email_returns_422(client):
         "email": "not-an-email",
     }
 
-    response = client.post("/user/signup", json=payload)
+    response = client.post("/user", json=payload)
 
     assert response.status_code == 422
 
@@ -48,7 +48,7 @@ def test_update_user_with_email_returns_422(client):
         "phone": "010-1111-2222",
         "email": "seo-update-block@example.com",
     }
-    create_response = client.post("/user/signup", json=create_payload)
+    create_response = client.post("/user", json=create_payload)
     assert create_response.status_code == 201
     user_id = create_response.json()["user_id"]
 
