@@ -5,10 +5,10 @@ import pytest
 from app.models.charging_log import ChargingLog
 from app.models.hydrogen_station import hydrogen_station
 from app.models.recommendation_history import recommendation_history
-from app.schemas.optimized_station_recommendation_schema import (
+from app.schemas.ai_recommendation_schema import (
     OptimizedStationRecommendationRequest,
 )
-from app.services.optimized_station_recommendation_service import (
+from app.services.ai_recommendation_service import (
     OptimizedStationRecommendationService,
 )
 

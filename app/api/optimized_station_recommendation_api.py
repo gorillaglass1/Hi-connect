@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.schemas.optimized_station_recommendation_schema import (
+from app.schemas.ai_recommendation_schema import (
     OptimizedStationRecommendationRequest,
     OptimizedStationRecommendationResponse,
 )
-from app.services.optimized_station_recommendation_service import (
+from app.services.ai_recommendation_service import (
     OptimizedStationRecommendationService,
 )
 
