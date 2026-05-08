@@ -28,7 +28,7 @@ source .venv/bin/activate
 가장 핵심이 되는 라이브러리들입니다.
 ```bash
 # 한 번에 설치하기
-pip install fastapi[all] sqlalchemy aiosqlite pytest pytest-asyncio httpx email-validator greenlet
+pip install fastapi[all] sqlalchemy aiosqlite pytest pytest-asyncio httpx email-validator greenlet google-genai
 ```
 
 **핵심 라이브러리 용도:**
@@ -37,6 +37,7 @@ pip install fastapi[all] sqlalchemy aiosqlite pytest pytest-asyncio httpx email-
 * **aiosqlite**: SQLite를 비동기로 제어하기 위한 드라이버
 * **pytest & pytest-asyncio**: 비동기 API 테스트용
 * **email-validator**: Pydantic에서 이메일 형식 검증 시 필요
+* **google-genai**: Google Gemini model을 코드에서 사용
 
 ---
 
