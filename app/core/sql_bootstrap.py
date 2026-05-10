@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import logging
+import re
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -26,6 +27,37 @@ def _normalize_sql_for_sqlite(statement: str) -> str:
     normalized = normalized.replace("start_hour", "start_time")
     normalized = normalized.replace("end_hour", "end_time")
     return normalized
+
+
+def _sqlite_statement_should_skip(statement: str) -> bool:
+    lowered = statement.strip().lower()
+    return lowered.startswith("create database ") or lowered.startswith("use ")
+
+
+def _extract_create_table_name(statement: str) -> str | None:
+    match = re.match(
+        r"^\s*create\s+table\s+(?:if\s+not\s+exists\s+)?[`\"]?([a-zA-Z_][\w]*)[`\"]?",
+        statement,
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return None
+    return match.group(1)
+
+
+async def _sqlite_table_exists(conn, table_name: str) -> bool:
+    result = await conn.execute(
+        text(
+            """
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table' AND lower(name) = lower(:table_name)
+            LIMIT 1
+            """
+        ),
+        {"table_name": table_name},
+    )
+    return result.scalar_one_or_none() is not None
 
 
 async def run_startup_sql(engine: AsyncEngine, sql_dir: str = "sql") -> None:
@@ -64,6 +96,11 @@ async def run_startup_sql(engine: AsyncEngine, sql_dir: str = "sql") -> None:
             for statement in statements:
                 executable = statement
                 if engine.dialect.name == "sqlite":
+                    if _sqlite_statement_should_skip(statement):
+                        continue
+                    table_name = _extract_create_table_name(statement)
+                    if table_name and await _sqlite_table_exists(conn, table_name):
+                        continue
                     executable = _normalize_sql_for_sqlite(statement)
                 try:
                     await conn.execute(text(executable))

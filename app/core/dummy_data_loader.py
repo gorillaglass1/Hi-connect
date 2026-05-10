@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+import re
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -16,7 +17,7 @@ ENABLE_DUMMY_DATA_ENV = "ENABLE_STARTUP_DUMMY_DATA"
 
 
 def _is_enabled() -> bool:
-    value = os.getenv(ENABLE_DUMMY_DATA_ENV, "false").strip().lower()
+    value = os.getenv(ENABLE_DUMMY_DATA_ENV, "true").strip().lower()
     return value in {"1", "true", "yes", "on"}
 
 
@@ -57,10 +58,17 @@ async def load_dummy_data_from_dml(engine: AsyncEngine, sql_dir: str = "sql") ->
 
             raw_sql = sql_file.read_text(encoding="utf-8")
             statements = _split_sql_statements(raw_sql)
+            if engine.dialect.name == "sqlite":
+                table_name = _extract_insert_table_name(statements[0]) if statements else None
+                if table_name and await _sqlite_table_has_rows(conn, table_name):
+                    await _mark_dml_file_as_run(conn, sql_file.name)
+                    continue
+
             for statement in statements:
                 executable = statement
                 if engine.dialect.name == "sqlite":
                     executable = _normalize_sql_for_sqlite(statement)
+                    executable = _normalize_insert_for_sqlite(executable)
                 try:
                     await conn.execute(text(executable))
                 except SQLAlchemyError as exc:
@@ -70,12 +78,7 @@ async def load_dummy_data_from_dml(engine: AsyncEngine, sql_dir: str = "sql") ->
                         exc,
                     )
 
-            await conn.execute(
-                text(
-                    "INSERT INTO _dml_bootstrap_runs (file_name) VALUES (:file_name)"
-                ),
-                {"file_name": sql_file.name},
-            )
+            await _mark_dml_file_as_run(conn, sql_file.name)
 
 
 def _ordered_dml_files(base_path: Path) -> list[Path]:
@@ -97,4 +100,41 @@ def _ordered_dml_files(base_path: Path) -> list[Path]:
     return sorted(
         files,
         key=lambda path: (order.get(path.name.lower(), 100), path.name.lower()),
+    )
+
+
+def _extract_insert_table_name(statement: str) -> str | None:
+    match = re.match(
+        r"^\s*insert\s+into\s+[`\"]?([a-zA-Z_][\w]*)[`\"]?",
+        statement,
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return None
+    return match.group(1)
+
+
+def _normalize_insert_for_sqlite(statement: str) -> str:
+    return re.sub(
+        r"^\s*insert\s+into\s+",
+        "INSERT OR IGNORE INTO ",
+        statement,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+
+
+async def _sqlite_table_has_rows(conn, table_name: str) -> bool:
+    result = await conn.execute(
+        text(f'SELECT 1 FROM "{table_name}" LIMIT 1')
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def _mark_dml_file_as_run(conn, file_name: str) -> None:
+    await conn.execute(
+        text(
+            "INSERT OR IGNORE INTO _dml_bootstrap_runs (file_name) VALUES (:file_name)"
+        ),
+        {"file_name": file_name},
     )

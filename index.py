@@ -4,11 +4,11 @@ from fastapi import FastAPI, Request
 from starlette.responses import FileResponse
 
 from app.api.charging_log_api import router as charging_log_router
+from app.api.ai_recommendation_api import router as ai_recommendation_router
 from app.api.hydrogen_charger_api import router as hydrogen_charger_router
 from app.api.hydrogen_station_api import router as hydrogen_station_router
 from app.api.hydrogen_station_realtime_api import router as hydrogen_station_realtime_router
 from app.api.hydrogen_station_reservation_api import router as hydrogen_station_reservation_router
-from app.api.optimized_station_recommendation_api import router as optimized_station_recommendation_router
 from app.api.recommendation_history_api import router as recommendation_history_router
 from app.api.user_api import router as user_router
 from app.api.vehicles_api import router as vehicles_router
@@ -43,7 +43,7 @@ app.include_router(hydrogen_charger_router)
 app.include_router(hydrogen_station_realtime_router)
 app.include_router(hydrogen_station_reservation_router)
 app.include_router(recommendation_history_router)
-app.include_router(optimized_station_recommendation_router)
+app.include_router(ai_recommendation_router)
 
 
 @app.middleware("http")
@@ -55,4 +55,3 @@ async def api_key_guard(request: Request, call_next):
 @app.get("/")
 async def mainPage():
     return FileResponse("app/src/index.html")
-
