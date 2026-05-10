@@ -11,7 +11,6 @@ class ChargingLog(Base):
     hydrogen_station_id = Column(
         Integer, ForeignKey("hydrogen_station.hydrogen_station_id"), nullable=False
     )
-    vehicle_id = Column(Integer, ForeignKey("vehicles.vehicle_id"), nullable=False)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
     charged_amount = Column(Numeric(6, 2))

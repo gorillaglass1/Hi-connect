@@ -10,7 +10,6 @@ class recommendation_history(Base):
 
     recommendation_id = Column(Integer,primary_key=True,autoincrement=True)
     user_id = Column(Integer,ForeignKey('users.user_id'),nullable=False)
-    vehicle_id = Column(Integer,ForeignKey('vehicles.vehicle_id'),nullable = False)
     hydrogen_station_id = Column(
         Integer,
         ForeignKey("hydrogen_station.hydrogen_station_id"),

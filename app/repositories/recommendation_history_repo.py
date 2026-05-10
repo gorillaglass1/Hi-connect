@@ -9,7 +9,6 @@ from app.models.recommendation_history import recommendation_history
 async def create_recommendation_history(
     db: AsyncSession,
     user_id: int,
-    vehicle_id: int,
     hydrogen_station_id: int,
     recommendation_score: float | None = None,
     recommendation_reason: str | None = None,
@@ -23,7 +22,6 @@ async def create_recommendation_history(
 ):
     row = recommendation_history(
         user_id=user_id,
-        vehicle_id=vehicle_id,
         hydrogen_station_id=hydrogen_station_id,
         recommendation_score=recommendation_score,
         recommendation_reason=recommendation_reason,
@@ -45,7 +43,6 @@ async def get_recommendation_histories(
     db: AsyncSession,
     recommendation_id: int | None = None,
     user_id: int | None = None,
-    vehicle_id: int | None = None,
     hydrogen_station_id: int | None = None,
     selected: bool | None = None,
     recommendation_type: str | None = None,
@@ -60,8 +57,6 @@ async def get_recommendation_histories(
         )
     if user_id is not None:
         query = query.where(recommendation_history.user_id == user_id)
-    if vehicle_id is not None:
-        query = query.where(recommendation_history.vehicle_id == vehicle_id)
     if hydrogen_station_id is not None:
         query = query.where(
             recommendation_history.hydrogen_station_id == hydrogen_station_id

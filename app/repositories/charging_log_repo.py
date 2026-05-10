@@ -10,7 +10,6 @@ async def create_charging_log(
     db: AsyncSession,
     user_id: int,
     hydrogen_station_id: int,
-    vehicle_id: int,
     start_time: datetime,
     end_time: datetime,
     charged_amount: float | None = None,
@@ -20,7 +19,6 @@ async def create_charging_log(
     row = ChargingLog(
         user_id=user_id,
         hydrogen_station_id=hydrogen_station_id,
-        vehicle_id=vehicle_id,
         start_time=start_time,
         end_time=end_time,
         charged_amount=charged_amount,
@@ -45,7 +43,6 @@ async def get_charging_logs(
     charging_log_id: int | None = None,
     user_id: int | None = None,
     hydrogen_station_id: int | None = None,
-    vehicle_id: int | None = None,
     limit: int = 100,
     offset: int = 0,
 ):
@@ -57,8 +54,6 @@ async def get_charging_logs(
         query = query.where(ChargingLog.user_id == user_id)
     if hydrogen_station_id is not None:
         query = query.where(ChargingLog.hydrogen_station_id == hydrogen_station_id)
-    if vehicle_id is not None:
-        query = query.where(ChargingLog.vehicle_id == vehicle_id)
 
     query = query.order_by(ChargingLog.start_time.desc()).limit(limit).offset(offset)
     result = await db.execute(query)
