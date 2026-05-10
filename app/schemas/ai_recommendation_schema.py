@@ -41,7 +41,7 @@ class RecommendationTrigger(BaseModel):
 
 
 class HydrogenPreferences(BaseModel):
-    preference_700bar: bool = True
+    preference_700bar: bool = Field(default=True)
     max_detour_km: float = Field(..., ge=0)
 
 

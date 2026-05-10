@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserCreate(BaseModel):
@@ -9,8 +9,8 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    name: str | None = None
-    phone: str | None = None
+    name: str | None = Field(default=None)
+    phone: str | None = Field(default=None)
 
 
 class UserResponse(UserCreate):

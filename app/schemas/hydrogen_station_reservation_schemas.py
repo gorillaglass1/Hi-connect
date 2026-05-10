@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HydrogenStationReservationCreate(BaseModel):
@@ -13,16 +13,16 @@ class HydrogenStationReservationCreate(BaseModel):
 
 
 class HydrogenStationReservationUpdate(BaseModel):
-    hydrogen_charger_id: int | None = None
-    hydrogen_station_id: int | None = None
-    reservation_status: str | None = None
-    user_id: int | None = None
-    reservation_time: datetime | None = None
-    expire_time: datetime | None = None
+    hydrogen_charger_id: int | None = Field(default=None)
+    hydrogen_station_id: int | None = Field(default=None)
+    reservation_status: str | None = Field(default=None)
+    user_id: int | None = Field(default=None)
+    reservation_time: datetime | None = Field(default=None)
+    expire_time: datetime | None = Field(default=None)
 
 
 class HydrogenStationReservationResponse(HydrogenStationReservationCreate):
     hydrogen_station_reservation_id: int
-    created_at: datetime | None = None
+    created_at: datetime | None = Field(default=None)
 
     model_config = ConfigDict(from_attributes=True)

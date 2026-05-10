@@ -1,6 +1,6 @@
 from datetime import time
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HydrogenStationCreate(BaseModel):
@@ -8,23 +8,23 @@ class HydrogenStationCreate(BaseModel):
     address: str
     latitude: float
     longitude: float
-    contact_number: str | None = None
-    start_time: time | None = None
-    end_time: time | None = None
-    total_chargers: int = 0
-    payment_supported: str | None = None
+    contact_number: str | None = Field(default=None)
+    start_time: time | None = Field(default=None)
+    end_time: time | None = Field(default=None)
+    total_chargers: int = Field(default=0)
+    payment_supported: str | None = Field(default=None)
 
 
 class HydrogenStationUpdate(BaseModel):
-    name: str | None = None
-    address: str | None = None
-    latitude: float | None = None
-    longitude: float | None = None
-    contact_number: str | None = None
-    start_time: time | None = None
-    end_time: time | None = None
-    total_chargers: int | None = None
-    payment_supported: str | None = None
+    name: str | None = Field(default=None)
+    address: str | None = Field(default=None)
+    latitude: float | None = Field(default=None)
+    longitude: float | None = Field(default=None)
+    contact_number: str | None = Field(default=None)
+    start_time: time | None = Field(default=None)
+    end_time: time | None = Field(default=None)
+    total_chargers: int | None = Field(default=None)
+    payment_supported: str | None = Field(default=None)
 
 
 class HydrogenStationResponse(HydrogenStationCreate):
