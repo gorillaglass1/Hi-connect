@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import charging_log_repo
@@ -9,34 +10,29 @@ class ChargingLogService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_charging_log(self, payload: ChargingLogCreate):
-        if payload.end_time <= payload.start_time:
-            raise HTTPException(status_code=400, detail="end_time must be after start_time")
-        if payload.charged_amount is not None and payload.charged_amount < 0:
-            raise HTTPException(status_code=400, detail="charged_amount must be >= 0")
-        if payload.charging_cost is not None and payload.charging_cost < 0:
-            raise HTTPException(status_code=400, detail="charging_cost must be >= 0")
-        if payload.waiting_time is not None and payload.waiting_time < 0:
-            raise HTTPException(status_code=400, detail="waiting_time must be >= 0")
+    async def create_charging_logs(self, payload: ChargingLogCreate):
+        for log in payload.logs:
+            if log.end_time <= log.start_time:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Charging log end_time must be after start_time",
+                )
 
-        return await charging_log_repo.create_charging_log(
-            self.db,
-            user_id=payload.user_id,
-            hydrogen_station_id=payload.hydrogen_station_id,
-            vehicle_id=payload.vehicle_id,
-            start_time=payload.start_time,
-            end_time=payload.end_time,
-            charged_amount=payload.charged_amount,
-            charging_cost=payload.charging_cost,
-            waiting_time=payload.waiting_time,
-        )
+        try:
+            return await charging_log_repo.create_charging_logs(self.db, payload)
+        except IntegrityError:
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail="One or more hydrogen stations do not exist",
+            )
 
     async def get_charging_logs(
         self,
         charging_log_id: int | None = None,
         user_id: int | None = None,
-        hydrogen_station_id: int | None = None,
         vehicle_id: int | None = None,
+        chrstn_mno: str | None = None,
         limit: int = 100,
         offset: int = 0,
     ):
@@ -44,8 +40,8 @@ class ChargingLogService:
             self.db,
             charging_log_id=charging_log_id,
             user_id=user_id,
-            hydrogen_station_id=hydrogen_station_id,
             vehicle_id=vehicle_id,
+            chrstn_mno=chrstn_mno,
             limit=limit,
             offset=offset,
         )

@@ -89,7 +89,8 @@ project_root/
 코드 수정 후에는 아래 명령어로 안정성을 확인합니다.
 
 * **서버 실행**: `uvicorn index:app --reload`
-  * 더미 DML 자동 주입이 필요하면 실행 전에 `ENABLE_STARTUP_DUMMY_DATA=true` 설정
+  * 더미 데이터는 서버 시작 시 자동 주입하지 않습니다.
+  * Supabase SQL Editor에서 `sql/hydrogen_station_seed.sql`을 한 번 실행해 개발용 데이터를 넣습니다.
 * **테스트 실행**: `pytest -q`
 * **API 문서 확인**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 

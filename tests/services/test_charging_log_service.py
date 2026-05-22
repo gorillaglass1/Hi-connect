@@ -1,28 +1,45 @@
-from datetime import datetime, timedelta
-
 import pytest
-from fastapi import HTTPException
 
-from app.schemas.charging_log_schemas import ChargingLogCreate
+from app.schemas.charging_log_schemas import ChargingLogCreate, ChargingLogItemCreate
+from app.schemas.hydrogen_stations_schemas import HydrogenStationCreate
 from app.services.charging_log_service import ChargingLogService
-from tests.test_data_factory import seed_base_entities
+from app.services.hydrogen_station_service import HydrogenStationService
 
 
 @pytest.mark.asyncio
-async def test_create_charging_log_invalid_time_raises_400(db_session):
-    base = await seed_base_entities(db_session)
-    service = ChargingLogService(db_session)
-    now = datetime.now()
-
-    with pytest.raises(HTTPException) as exc:
-        await service.create_charging_log(
-            ChargingLogCreate(
-                user_id=base["user"].user_id,
-                hydrogen_station_id=base["station"].hydrogen_station_id,
-                vehicle_id=base["vehicle"].vehicle_id,
-                start_time=now,
-                end_time=now - timedelta(minutes=1),
-            )
+async def test_create_charging_logs_returns_list(db_session):
+    station_service = HydrogenStationService(db_session)
+    await station_service.create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="LOG-SVC-001",
+            chrstn_nm="서비스 로그 충전소 1",
         )
+    )
+    await station_service.create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="LOG-SVC-002",
+            chrstn_nm="서비스 로그 충전소 2",
+        )
+    )
 
-    assert exc.value.status_code == 400
+    rows = await ChargingLogService(db_session).create_charging_logs(
+        ChargingLogCreate(
+            user_id=3,
+            vehicle_id=30,
+            logs=[
+                ChargingLogItemCreate(
+                    chrstn_mno="LOG-SVC-001",
+                    start_time="2026-05-22T08:00:00",
+                    end_time="2026-05-22T08:10:00",
+                ),
+                ChargingLogItemCreate(
+                    chrstn_mno="LOG-SVC-002",
+                    start_time="2026-05-22T09:00:00",
+                    end_time="2026-05-22T09:10:00",
+                ),
+            ],
+        )
+    )
+
+    assert len(rows) == 2
+    assert [row.chrstn_mno for row in rows] == ["LOG-SVC-001", "LOG-SVC-002"]

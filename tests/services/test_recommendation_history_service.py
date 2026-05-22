@@ -1,25 +1,48 @@
 import pytest
 
-from app.schemas.recommendation_history_schema import RecommendationHistoryCreate
+from app.schemas.hydrogen_stations_schemas import HydrogenStationCreate
+from app.schemas.recommendation_history_schema import (
+    RecommendationHistoryCreate,
+    RecommendationStationCreate,
+)
+from app.services.hydrogen_station_service import HydrogenStationService
 from app.services.recommendation_history_service import RecommendationHistoryService
-from tests.test_data_factory import seed_base_entities
 
 
 @pytest.mark.asyncio
-async def test_create_recommendation_history_success(db_session):
-    base = await seed_base_entities(db_session)
-    service = RecommendationHistoryService(db_session)
-
-    row = await service.create_recommendation_history(
-        RecommendationHistoryCreate(
-            user_id=base["user"].user_id,
-            vehicle_id=base["vehicle"].vehicle_id,
-            hydrogen_station_id=base["station"].hydrogen_station_id,
-            recommendation_score=90.0,
-            recommendation_type="distance",
-            selected=True,
+async def test_create_recommendation_histories_returns_list(db_session):
+    station_service = HydrogenStationService(db_session)
+    await station_service.create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="REC-SVC-001",
+            chrstn_nm="서비스 추천 충전소 1",
+        )
+    )
+    await station_service.create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="REC-SVC-002",
+            chrstn_nm="서비스 추천 충전소 2",
         )
     )
 
-    assert row.recommendation_id is not None
-    assert row.selected is True
+    rows = await RecommendationHistoryService(
+        db_session
+    ).create_recommendation_histories(
+        RecommendationHistoryCreate(
+            user_id=3,
+            vehicle_id=30,
+            recommendations=[
+                RecommendationStationCreate(
+                    chrstn_mno="REC-SVC-001",
+                    recommendation_score="95.00",
+                ),
+                RecommendationStationCreate(
+                    chrstn_mno="REC-SVC-002",
+                    recommendation_score="89.00",
+                ),
+            ],
+        )
+    )
+
+    assert len(rows) == 2
+    assert [row.chrstn_mno for row in rows] == ["REC-SVC-001", "REC-SVC-002"]

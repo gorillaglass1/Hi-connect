@@ -1,59 +1,110 @@
-from datetime import datetime, timedelta
-
-
-def test_create_charging_log_success(client):
-    user = client.post(
-        "/user/signup",
-        json={"name": "C1", "phone": "010-3", "email": "c1@example.com"},
-    ).json()
-    station = client.post(
-        "/hydrogen-stations",
-        json={
-            "name": "C-Station",
-            "address": "Seoul",
-            "latitude": 37.5,
-            "longitude": 127.0,
-            "total_chargers": 2,
+def test_create_charging_logs_with_multiple_stations(client):
+    for station in [
+        {
+            "chrstn_mno": "LOG-ST-001",
+            "chrstn_nm": "로그 테스트 충전소 1",
         },
-    ).json()
-    vehicle = client.post(
-        "/vehicles",
-        json={
-            "user_id": user["user_id"],
-            "vehicle_number": "11가1111",
-            "model": "NEXO",
-            "vehicle_type": "SUV",
-            "fuel_type": "hydrogen",
-            "tank_capacity": 6.0,
+        {
+            "chrstn_mno": "LOG-ST-002",
+            "chrstn_nm": "로그 테스트 충전소 2",
         },
-    ).json()
+    ]:
+        client.post("/hydrogen-stations", json=station)
 
-    now = datetime.now()
-    res = client.post(
-        "/charging-logs",
-        json={
-            "user_id": user["user_id"],
-            "hydrogen_station_id": station["hydrogen_station_id"],
-            "vehicle_id": vehicle["vehicle_id"],
-            "start_time": now.isoformat(),
-            "end_time": (now + timedelta(minutes=30)).isoformat(),
-            "charged_amount": 3.2,
-        },
-    )
-
-    assert res.status_code == 201
-
-
-def test_create_charging_log_invalid_time_returns_400(client):
-    now = datetime.now()
     res = client.post(
         "/charging-logs",
         json={
             "user_id": 1,
-            "hydrogen_station_id": 1,
-            "vehicle_id": 1,
-            "start_time": now.isoformat(),
-            "end_time": (now - timedelta(minutes=1)).isoformat(),
+            "vehicle_id": 10,
+            "logs": [
+                {
+                    "chrstn_mno": "LOG-ST-001",
+                    "start_time": "2026-05-22T08:10:00",
+                    "end_time": "2026-05-22T08:24:00",
+                    "charged_amount": "3.80",
+                    "charging_cost": "36860.00",
+                    "waiting_time": 0,
+                },
+                {
+                    "chrstn_mno": "LOG-ST-002",
+                    "start_time": "2026-05-22T09:00:00",
+                    "end_time": "2026-05-22T09:18:00",
+                    "charged_amount": "4.10",
+                    "charging_cost": "40590.00",
+                    "waiting_time": 3,
+                },
+            ],
         },
     )
+
+    assert res.status_code == 201
+    body = res.json()
+    assert len(body) == 2
+    assert [row["chrstn_mno"] for row in body] == ["LOG-ST-001", "LOG-ST-002"]
+    assert body[0]["user_id"] == 1
+    assert body[0]["vehicle_id"] == 10
+
+
+def test_create_charging_logs_invalid_time_returns_400(client):
+    client.post(
+        "/hydrogen-stations",
+        json={
+            "chrstn_mno": "LOG-ST-BAD-TIME",
+            "chrstn_nm": "로그 시간 검증 충전소",
+        },
+    )
+
+    res = client.post(
+        "/charging-logs",
+        json={
+            "user_id": 1,
+            "vehicle_id": 10,
+            "logs": [
+                {
+                    "chrstn_mno": "LOG-ST-BAD-TIME",
+                    "start_time": "2026-05-22T09:00:00",
+                    "end_time": "2026-05-22T08:59:00",
+                }
+            ],
+        },
+    )
+
     assert res.status_code == 400
+
+
+def test_list_charging_logs_filters_by_user_and_station(client):
+    client.post(
+        "/hydrogen-stations",
+        json={
+            "chrstn_mno": "LOG-ST-LIST-001",
+            "chrstn_nm": "로그 목록 충전소",
+        },
+    )
+    client.post(
+        "/charging-logs",
+        json={
+            "user_id": 2,
+            "vehicle_id": 20,
+            "logs": [
+                {
+                    "chrstn_mno": "LOG-ST-LIST-001",
+                    "start_time": "2026-05-22T10:00:00",
+                    "end_time": "2026-05-22T10:20:00",
+                }
+            ],
+        },
+    )
+
+    res = client.get(
+        "/charging-logs",
+        params={
+            "user_id": 2,
+            "chrstn_mno": "LOG-ST-LIST-001",
+        },
+    )
+
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body) == 1
+    assert body[0]["chrstn_mno"] == "LOG-ST-LIST-001"
+    assert body[0]["vehicle_id"] == 20

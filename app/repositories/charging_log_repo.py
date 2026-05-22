@@ -1,60 +1,60 @@
-from datetime import datetime
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.charging_log import ChargingLog
+from app.schemas.charging_log_schemas import ChargingLogCreate
 
 
-async def create_charging_log(
+async def create_charging_logs(
     db: AsyncSession,
-    user_id: int,
-    hydrogen_station_id: int,
-    start_time: datetime,
-    end_time: datetime,
-    charged_amount: float | None = None,
-    charging_cost: float | None = None,
-    waiting_time: int | None = None,
-):
-    row = ChargingLog(
-        user_id=user_id,
-        hydrogen_station_id=hydrogen_station_id,
-        start_time=start_time,
-        end_time=end_time,
-        charged_amount=charged_amount,
-        charging_cost=charging_cost,
-        waiting_time=waiting_time,
-    )
-    db.add(row)
+    payload: ChargingLogCreate,
+) -> list[ChargingLog]:
+    rows = [
+        ChargingLog(
+            user_id=payload.user_id,
+            vehicle_id=payload.vehicle_id,
+            chrstn_mno=log.chrstn_mno,
+            start_time=log.start_time,
+            end_time=log.end_time,
+            charged_amount=log.charged_amount,
+            charging_cost=log.charging_cost,
+            waiting_time=log.waiting_time,
+        )
+        for log in payload.logs
+    ]
+    db.add_all(rows)
     await db.commit()
-    await db.refresh(row)
-    return row
 
+    for row in rows:
+        await db.refresh(row)
 
-async def get_charging_log_by_id(db: AsyncSession, charging_log_id: int):
-    result = await db.execute(
-        select(ChargingLog).where(ChargingLog.charging_log_id == charging_log_id)
-    )
-    return result.scalar_one_or_none()
+    return rows
 
 
 async def get_charging_logs(
     db: AsyncSession,
     charging_log_id: int | None = None,
     user_id: int | None = None,
-    hydrogen_station_id: int | None = None,
+    vehicle_id: int | None = None,
+    chrstn_mno: str | None = None,
     limit: int = 100,
     offset: int = 0,
-):
+) -> list[ChargingLog]:
     query = select(ChargingLog)
 
     if charging_log_id is not None:
         query = query.where(ChargingLog.charging_log_id == charging_log_id)
     if user_id is not None:
         query = query.where(ChargingLog.user_id == user_id)
-    if hydrogen_station_id is not None:
-        query = query.where(ChargingLog.hydrogen_station_id == hydrogen_station_id)
+    if vehicle_id is not None:
+        query = query.where(ChargingLog.vehicle_id == vehicle_id)
+    if chrstn_mno is not None:
+        query = query.where(ChargingLog.chrstn_mno == chrstn_mno)
 
-    query = query.order_by(ChargingLog.start_time.desc()).limit(limit).offset(offset)
+    query = (
+        query.order_by(ChargingLog.charging_log_id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
     result = await db.execute(query)
-    return result.scalars().all()
+    return list(result.scalars().all())

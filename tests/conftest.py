@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import Base, get_db
 from index import app
 
-TEST_DB_PATH = "./test_user_api.db"
+TEST_DB_PATH = "./test_hydrogen_station_api.db"
 TEST_DB_URL = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
 
 

@@ -33,6 +33,9 @@ build/
 *.sqlite3
 
 # Local secrets
+.env
+.env.*
+!.env.example
 app/core/gemini.properties
 
 guide.md
