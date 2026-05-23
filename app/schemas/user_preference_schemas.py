@@ -15,6 +15,12 @@ class UserPreferenceUpdate(UserPreferenceBase):
     pass
 
 
+class UserCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50, description="사용자 이름")
+    phone: str | None = Field(default=None, max_length=20, description="사용자 전화번호")
+    email: str | None = Field(default=None, max_length=255, description="사용자 이메일")
+
+
 class UserPreferenceResponse(UserPreferenceBase):
     model_config = ConfigDict(from_attributes=True)
 

@@ -3,16 +3,57 @@ from decimal import Decimal
 
 from app.models.user import User
 from app.schemas.hydrogen_stations_schemas import HydrogenStationCreate
-from app.schemas.user_preference_schemas import UserPreferenceUpdate
+from app.schemas.user_preference_schemas import UserCreate, UserPreferenceUpdate
 from app.schemas.recommendation_request_schemas import RecommendationSearchRequest
 from app.services.hydrogen_station_service import HydrogenStationService
 from app.services.user_preference_service import UserPreferenceService
 from app.services.recommendation_service import RecommendationService
-from app.api.navigation_api import PushWaypointRequest, push_waypoint
 
 
 @pytest.mark.asyncio
-async def test_personalized_recommendation_and_preferences(db_session):
+async def test_create_user_initializes_default_preferences(db_session):
+    user = await UserPreferenceService(db_session).create_user(
+        UserCreate(
+            name="신규사용자",
+            phone="010-1111-2222",
+            email="new-user@example.com",
+        )
+    )
+
+    assert user.user_id is not None
+    assert user.name == "신규사용자"
+    assert user.preferences is not None
+    assert user.preferences.weight_price == Decimal("1.0")
+
+
+@pytest.mark.asyncio
+async def test_create_user_rejects_duplicate_email(db_session):
+    service = UserPreferenceService(db_session)
+    payload = UserCreate(
+        name="중복사용자",
+        phone="010-1111-2222",
+        email="duplicate@example.com",
+    )
+
+    await service.create_user(payload)
+
+    with pytest.raises(Exception) as exc_info:
+        await service.create_user(payload)
+
+    assert getattr(exc_info.value, "status_code", None) == 409
+
+
+@pytest.mark.asyncio
+async def test_personalized_recommendation_and_preferences(db_session, monkeypatch):
+    async def use_only_test_stations(self, _nl_query):
+        return ["TEST-ST-001", "TEST-ST-002"]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_only_test_stations,
+    )
+
     # 1. Create a dummy user in database
     user = User(
         user_id=99,
@@ -84,6 +125,7 @@ async def test_personalized_recommendation_and_preferences(db_session):
         destination_longitude=Decimal("126.4500"),
         remaining_range=Decimal("45.0"),
         alpha=Decimal("15.0"),
+        nl_query="테스트 충전소만",
     )
     
     recommendations = await rec_service.get_personalized_recommendations(request)
@@ -95,3 +137,8 @@ async def test_personalized_recommendation_and_preferences(db_session):
     assert recommendations[0].chrstn_mno == "TEST-ST-001"
     assert recommendations[0].final_score > 0.0
     assert recommendations[0].is_reachable is True
+    assert recommendations[0].delivery_payload.source == "HY_CONNECT"
+    assert recommendations[0].delivery_payload.user_id == 99
+    assert recommendations[0].delivery_payload.station.chrstn_mno == "TEST-ST-001"
+    assert recommendations[0].delivery_payload.route_context.remaining_range_km == 45.0
+    assert recommendations[0].delivery_payload.final_score == recommendations[0].final_score

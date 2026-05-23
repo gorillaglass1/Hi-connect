@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.schemas.user_preference_schemas import (
+    UserCreate,
     UserPreferenceUpdate,
     UserPreferenceResponse,
     UserResponse,
@@ -9,6 +10,14 @@ from app.schemas.user_preference_schemas import (
 from app.services.user_preference_service import UserPreferenceService
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.post("", response_model=UserResponse, status_code=201)
+async def create_user(
+    payload: UserCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    return await UserPreferenceService(db).create_user(payload)
 
 
 @router.get("/{user_id}", response_model=UserResponse)

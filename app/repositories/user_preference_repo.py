@@ -1,8 +1,20 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from app.models.user import User
 from app.models.user_preference import UserPreference
-from app.schemas.user_preference_schemas import UserPreferenceUpdate
+from app.schemas.user_preference_schemas import UserCreate, UserPreferenceUpdate
+
+
+async def create_user(
+    db: AsyncSession,
+    payload: UserCreate,
+) -> User:
+    user = User(**payload.model_dump())
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
 
 
 async def get_user_preferences(
@@ -60,12 +72,15 @@ async def update_user_preferences(
 
 
 async def get_user(db: AsyncSession, user_id: int) -> User:
-    stmt = select(User).where(User.user_id == user_id)
+    stmt = (
+        select(User)
+        .where(User.user_id == user_id)
+        .options(selectinload(User.preferences))
+    )
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user is not None:
-        # Load preferences
         await get_user_preferences(db, user_id)
-        # Refresh to load relationships
-        await db.refresh(user)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
     return user

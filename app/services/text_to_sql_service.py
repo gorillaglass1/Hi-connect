@@ -145,5 +145,6 @@ Generated SQL:"""
             matching_mno_list = [row[0] for row in rows if row[0] is not None]
             return matching_mno_list
         except Exception as e:
+            await self.db.rollback()
             logger.error(f"Failed to execute semantic search SQL query '{sql_query}': {e}")
             return None

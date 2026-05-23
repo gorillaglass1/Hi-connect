@@ -1,5 +1,4 @@
 import math
-import os
 import logging
 from decimal import Decimal
 from sqlalchemy import select
@@ -8,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 
 from app.models.hydrogen_stations import HydrogenStation
-from app.models.recommendation_history import RecommendationHistory
 from app.repositories import user_preference_repo, recommendation_history_repo
 from app.schemas.recommendation_request_schemas import (
     RecommendationSearchRequest,
@@ -19,9 +17,16 @@ from app.schemas.recommendation_history_schema import (
     RecommendationHistoryCreate,
     RecommendationStationCreate,
 )
-from app.services.text_to_sql_service import TextToSqlService
+from app.services.recommendation_candidate_filter_service import (
+    RecommendationCandidateFilterService,
+)
+from app.services.recommendation_delivery_payload_service import (
+    RecommendationDeliveryPayloadService,
+)
 
 logger = logging.getLogger("recommendation_service")
+
+RECOMMENDATION_RESPONSE_LIMIT = 5
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -40,7 +45,8 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 class RecommendationService:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.text_to_sql_service = TextToSqlService(db)
+        self.candidate_filter_service = RecommendationCandidateFilterService(db)
+        self.delivery_payload_service = RecommendationDeliveryPayloadService()
 
     async def get_personalized_recommendations(
         self,
@@ -61,18 +67,12 @@ class RecommendationService:
         w_facilities = float(pref.weight_facilities)
         safety_margin = float(pref.safety_margin)
 
-        # 2. Step 1: Text-to-SQL Semantic Filter
-        filtered_mno_list = None
-        if request.nl_query and request.nl_query.strip():
-            logger.info(f"Running Text-to-SQL for query: '{request.nl_query}'")
-            filtered_mno_list = await self.text_to_sql_service.execute_semantic_search(request.nl_query)
-            if filtered_mno_list is not None:
-                logger.info(f"Text-to-SQL matched {len(filtered_mno_list)} stations.")
-                if not filtered_mno_list:
-                    # Semantic search yielded zero results, return early empty list
-                    return []
-            else:
-                logger.warning("Text-to-SQL returned None (possibly missing Gemini key). Falling back to global list.")
+        # 2. Step 1: Optional Text-to-SQL candidate filter.
+        filtered_mno_list = await self.candidate_filter_service.filter_by_natural_language(
+            request.nl_query
+        )
+        if filtered_mno_list == []:
+            return []
 
         # 3. Query all stations from DB with status and facilities relationships
         stmt = (
@@ -224,36 +224,62 @@ class RecommendationService:
                 f"&waypoint1_name={st.chrstn_nm}&user_id={request.user_id}"
             )
 
+            rounded_scores = SubScores(
+                price=round(price_score, 1),
+                waiting_time=round(wait_score, 1),
+                distance=round(dist_score, 1),
+                facilities=round(fac_score, 1),
+            )
+            rounded_final_score = round(final_score, 1)
+            rounded_distance_to_station = round(dist_to_st, 2)
+            rounded_distance_to_destination = round(cand["dist_to_dest"], 2)
+            rounded_detour = round(detour, 2)
+            recommendation_type = "PERSONALIZED" if not request.nl_query else "SEMANTIC_AI"
+            station_address = st.road_nm_addr or st.lotno_addr
+            delivery_payload = self.delivery_payload_service.build(
+                request=request,
+                recommendation_type=recommendation_type,
+                chrstn_mno=st.chrstn_mno,
+                chrstn_nm=st.chrstn_nm,
+                station_latitude=cand["lat"],
+                station_longitude=cand["lon"],
+                station_address=station_address,
+                distance_to_station=rounded_distance_to_station,
+                distance_to_destination=rounded_distance_to_destination,
+                detour_distance=rounded_detour,
+                is_reachable=is_reachable,
+                scores=rounded_scores,
+                final_score=rounded_final_score,
+                recommendation_reason=reason_str,
+            )
+
             scored_candidates.append(
                 RecommendedStationResponse(
                     chrstn_mno=st.chrstn_mno,
                     chrstn_nm=st.chrstn_nm,
-                    road_nm_addr=st.road_nm_addr or st.lotno_addr,
+                    road_nm_addr=station_address,
                     ntsl_pc=st.ntsl_pc,
-                    distance_to_station=round(dist_to_st, 2),
-                    distance_to_destination=round(cand["dist_to_dest"], 2),
-                    detour_distance=round(detour, 2),
+                    distance_to_station=rounded_distance_to_station,
+                    distance_to_destination=rounded_distance_to_destination,
+                    detour_distance=rounded_detour,
                     wait_vehicles=wait_cars,
                     wait_time_minutes=wait_cars * 15,
                     facilities=active_facilities,
                     is_reachable=is_reachable,
-                    sub_scores=SubScores(
-                        price=round(price_score, 1),
-                        waiting_time=round(wait_score, 1),
-                        distance=round(dist_score, 1),
-                        facilities=round(fac_score, 1),
-                    ),
-                    final_score=round(final_score, 1),
+                    sub_scores=rounded_scores,
+                    final_score=rounded_final_score,
                     recommendation_reason=reason_str,
+                    delivery_payload=delivery_payload,
                     hyundai_nav_deeplink=deeplink,
                 )
             )
 
         # 7. Sort by final score descending
         scored_candidates.sort(key=lambda x: x.final_score, reverse=True)
+        limited_recommendations = scored_candidates[:RECOMMENDATION_RESPONSE_LIMIT]
 
         # 8. Record the top recommendations in history for analytics (up to top 5)
-        top_recs = scored_candidates[:5]
+        top_recs = limited_recommendations
         if top_recs:
             history_payload = RecommendationHistoryCreate(
                 user_id=request.user_id,
@@ -276,4 +302,4 @@ class RecommendationService:
             # Commit background recommendation logs asynchronously
             await recommendation_history_repo.create_recommendation_histories(self.db, history_payload)
 
-        return scored_candidates
+        return limited_recommendations

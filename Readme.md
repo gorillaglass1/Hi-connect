@@ -96,6 +96,20 @@ project_root/
 
 ---
 
+## 🔐 6. 환경 변수
+
+루트에 `.env` 파일을 만들고 `.env.example`을 참고해 값을 채웁니다. Gemini Text-to-SQL을 사용하려면 아래 중 하나를 설정합니다.
+
+```dotenv
+GEMINI_API_KEY=발급받은_Gemini_API_Key
+# 또는
+GOOGLE_API_KEY=발급받은_Google_API_Key
+```
+
+키가 없으면 자연어 Text-to-SQL 필터만 비활성화되고, 추천 엔진은 전체 충전소 후보 기준으로 계속 동작합니다.
+
+---
+
 ## ⚠️ 팀원 주의사항
 * **DB 세션**: 반드시 `Depends(get_db)`를 통해 주입받은 `AsyncSession`을 사용하세요.
 * **테스트 DB**: 테스트 실행 시 `test_user_api.db`가 자동으로 생성 및 삭제됩니다. 실제 개발 DB와 혼동하지 않도록 주의하세요.

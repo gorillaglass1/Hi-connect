@@ -1,12 +1,31 @@
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories import user_preference_repo
-from app.schemas.user_preference_schemas import UserPreferenceUpdate, UserPreferenceResponse, UserResponse
+from app.schemas.user_preference_schemas import (
+    UserCreate,
+    UserPreferenceUpdate,
+    UserPreferenceResponse,
+    UserResponse,
+)
 
 
 class UserPreferenceService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def create_user(self, payload: UserCreate) -> UserResponse:
+        try:
+            user = await user_preference_repo.create_user(self.db, payload)
+        except IntegrityError:
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="User email already exists",
+            )
+
+        await user_preference_repo.get_user_preferences(self.db, user.user_id)
+        return await self.get_user(user.user_id)
 
     async def get_user_preferences(self, user_id: int) -> UserPreferenceResponse:
         pref = await user_preference_repo.get_user_preferences(self.db, user_id)
