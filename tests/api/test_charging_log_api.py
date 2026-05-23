@@ -15,7 +15,6 @@ def test_create_charging_logs_with_multiple_stations(client):
         "/charging-logs",
         json={
             "user_id": 1,
-            "vehicle_id": 10,
             "logs": [
                 {
                     "chrstn_mno": "LOG-ST-001",
@@ -42,7 +41,6 @@ def test_create_charging_logs_with_multiple_stations(client):
     assert len(body) == 2
     assert [row["chrstn_mno"] for row in body] == ["LOG-ST-001", "LOG-ST-002"]
     assert body[0]["user_id"] == 1
-    assert body[0]["vehicle_id"] == 10
 
 
 def test_create_charging_logs_invalid_time_returns_400(client):
@@ -58,7 +56,6 @@ def test_create_charging_logs_invalid_time_returns_400(client):
         "/charging-logs",
         json={
             "user_id": 1,
-            "vehicle_id": 10,
             "logs": [
                 {
                     "chrstn_mno": "LOG-ST-BAD-TIME",
@@ -84,7 +81,6 @@ def test_list_charging_logs_filters_by_user_and_station(client):
         "/charging-logs",
         json={
             "user_id": 2,
-            "vehicle_id": 20,
             "logs": [
                 {
                     "chrstn_mno": "LOG-ST-LIST-001",
@@ -107,4 +103,3 @@ def test_list_charging_logs_filters_by_user_and_station(client):
     body = res.json()
     assert len(body) == 1
     assert body[0]["chrstn_mno"] == "LOG-ST-LIST-001"
-    assert body[0]["vehicle_id"] == 20

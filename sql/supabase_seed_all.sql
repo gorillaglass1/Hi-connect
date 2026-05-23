@@ -34,7 +34,6 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS charging_log (
     charging_log_id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    vehicle_id BIGINT NOT NULL,
     chrstn_mno VARCHAR(30) NOT NULL REFERENCES hydrogen_stations(chrstn_mno) ON DELETE CASCADE,
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP NOT NULL,
@@ -47,7 +46,6 @@ CREATE TABLE IF NOT EXISTS charging_log (
 CREATE TABLE IF NOT EXISTS recommendation_history (
     recommendation_id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    vehicle_id BIGINT NOT NULL,
     chrstn_mno VARCHAR(30) NOT NULL REFERENCES hydrogen_stations(chrstn_mno) ON DELETE CASCADE,
     recommendation_score NUMERIC(5, 2),
     recommendation_reason VARCHAR(255),
@@ -60,6 +58,9 @@ CREATE TABLE IF NOT EXISTS recommendation_history (
     recommendation_type VARCHAR(50),
     created_at TIMESTAMP DEFAULT now()
 );
+
+ALTER TABLE charging_log DROP COLUMN IF EXISTS vehicle_id;
+ALTER TABLE recommendation_history DROP COLUMN IF EXISTS vehicle_id;
 
 INSERT INTO users (
     user_id,
@@ -83,8 +84,7 @@ SELECT setval(
 );
 
 DELETE FROM charging_log
-WHERE user_id IN (1, 2, 3, 4)
-  AND vehicle_id IN (101, 201, 301, 401);
+WHERE user_id IN (1, 2, 3, 4);
 
 WITH station_refs AS (
     SELECT chrstn_mno,
@@ -104,14 +104,13 @@ seed_logs AS (
     SELECT *
     FROM (
         VALUES
-            (1, 101, 1, TIMESTAMP '2026-05-22 08:10:00', TIMESTAMP '2026-05-22 08:24:00', 3.80::NUMERIC(6, 2), 36860.00::NUMERIC(10, 2), 0),
-            (1, 101, 2, TIMESTAMP '2026-05-21 18:20:00', TIMESTAMP '2026-05-21 18:39:00', 4.10::NUMERIC(6, 2), 40590.00::NUMERIC(10, 2), 3),
-            (2, 201, 3, TIMESTAMP '2026-05-21 09:05:00', TIMESTAMP '2026-05-21 09:31:00', 5.20::NUMERIC(6, 2), 49920.00::NUMERIC(10, 2), 8),
-            (3, 301, 4, TIMESTAMP '2026-05-20 14:00:00', TIMESTAMP '2026-05-20 14:18:00', 3.40::NUMERIC(6, 2), 34340.00::NUMERIC(10, 2), 2),
-            (4, 401, 5, TIMESTAMP '2026-05-19 11:30:00', TIMESTAMP '2026-05-19 11:52:00', 4.80::NUMERIC(6, 2), 47040.00::NUMERIC(10, 2), 4)
+            (1, 1, TIMESTAMP '2026-05-22 08:10:00', TIMESTAMP '2026-05-22 08:24:00', 3.80::NUMERIC(6, 2), 36860.00::NUMERIC(10, 2), 0),
+            (1, 2, TIMESTAMP '2026-05-21 18:20:00', TIMESTAMP '2026-05-21 18:39:00', 4.10::NUMERIC(6, 2), 40590.00::NUMERIC(10, 2), 3),
+            (2, 3, TIMESTAMP '2026-05-21 09:05:00', TIMESTAMP '2026-05-21 09:31:00', 5.20::NUMERIC(6, 2), 49920.00::NUMERIC(10, 2), 8),
+            (3, 4, TIMESTAMP '2026-05-20 14:00:00', TIMESTAMP '2026-05-20 14:18:00', 3.40::NUMERIC(6, 2), 34340.00::NUMERIC(10, 2), 2),
+            (4, 5, TIMESTAMP '2026-05-19 11:30:00', TIMESTAMP '2026-05-19 11:52:00', 4.80::NUMERIC(6, 2), 47040.00::NUMERIC(10, 2), 4)
     ) AS rows(
         user_id,
-        vehicle_id,
         station_rank,
         start_time,
         end_time,
@@ -122,7 +121,6 @@ seed_logs AS (
 )
 INSERT INTO charging_log (
     user_id,
-    vehicle_id,
     chrstn_mno,
     start_time,
     end_time,
@@ -131,7 +129,6 @@ INSERT INTO charging_log (
     waiting_time
 )
 SELECT seed_logs.user_id,
-       seed_logs.vehicle_id,
        station_refs.chrstn_mno,
        seed_logs.start_time,
        seed_logs.end_time,
@@ -143,8 +140,7 @@ JOIN station_refs
   ON station_refs.station_rank = seed_logs.station_rank;
 
 DELETE FROM recommendation_history
-WHERE user_id IN (1, 2, 3, 4)
-  AND vehicle_id IN (101, 201, 301, 401);
+WHERE user_id IN (1, 2, 3, 4);
 
 WITH station_refs AS (
     SELECT chrstn_mno,
@@ -164,14 +160,13 @@ seed_recommendations AS (
     SELECT *
     FROM (
         VALUES
-            (1, 101, 1, 96.50::NUMERIC(5, 2), '대기 차량이 가장 적은 충전소입니다.', 37.3920000::NUMERIC(10, 7), 126.6510000::NUMERIC(10, 7), 32.50::NUMERIC(6, 2), 8, true, TIMESTAMP '2026-05-22 08:00:00', 'LOW_WAIT'),
-            (1, 101, 2, 88.00::NUMERIC(5, 2), '영업중이며 접근성이 좋습니다.', 37.4605000::NUMERIC(10, 7), 126.4510000::NUMERIC(10, 7), 32.50::NUMERIC(6, 2), 18, false, NULL::TIMESTAMP, 'NEARBY'),
-            (2, 201, 3, 72.00::NUMERIC(5, 2), '영업중이나 대기 차량이 많습니다.', 37.4050000::NUMERIC(10, 7), 126.7210000::NUMERIC(10, 7), 18.20::NUMERIC(6, 2), 12, false, NULL::TIMESTAMP, 'LOW_DISTANCE'),
-            (3, 301, 4, 84.20::NUMERIC(5, 2), '비교 추천 데이터입니다.', 37.5705000::NUMERIC(10, 7), 126.8810000::NUMERIC(10, 7), 41.00::NUMERIC(6, 2), 15, true, TIMESTAMP '2026-05-20 13:50:00', 'NEARBY'),
-            (4, 401, 5, 45.00::NUMERIC(5, 2), '운영상태에 따른 낮은 우선순위 추천입니다.', 37.3910000::NUMERIC(10, 7), 127.1120000::NUMERIC(10, 7), 12.00::NUMERIC(6, 2), 20, false, NULL::TIMESTAMP, 'STATUS_PENALTY')
+            (1, 1, 96.50::NUMERIC(5, 2), '대기 차량이 가장 적은 충전소입니다.', 37.3920000::NUMERIC(10, 7), 126.6510000::NUMERIC(10, 7), 32.50::NUMERIC(6, 2), 8, true, TIMESTAMP '2026-05-22 08:00:00', 'LOW_WAIT'),
+            (1, 2, 88.00::NUMERIC(5, 2), '영업중이며 접근성이 좋습니다.', 37.4605000::NUMERIC(10, 7), 126.4510000::NUMERIC(10, 7), 32.50::NUMERIC(6, 2), 18, false, NULL::TIMESTAMP, 'NEARBY'),
+            (2, 3, 72.00::NUMERIC(5, 2), '영업중이나 대기 차량이 많습니다.', 37.4050000::NUMERIC(10, 7), 126.7210000::NUMERIC(10, 7), 18.20::NUMERIC(6, 2), 12, false, NULL::TIMESTAMP, 'LOW_DISTANCE'),
+            (3, 4, 84.20::NUMERIC(5, 2), '비교 추천 데이터입니다.', 37.5705000::NUMERIC(10, 7), 126.8810000::NUMERIC(10, 7), 41.00::NUMERIC(6, 2), 15, true, TIMESTAMP '2026-05-20 13:50:00', 'NEARBY'),
+            (4, 5, 45.00::NUMERIC(5, 2), '운영상태에 따른 낮은 우선순위 추천입니다.', 37.3910000::NUMERIC(10, 7), 127.1120000::NUMERIC(10, 7), 12.00::NUMERIC(6, 2), 20, false, NULL::TIMESTAMP, 'STATUS_PENALTY')
     ) AS rows(
         user_id,
-        vehicle_id,
         station_rank,
         recommendation_score,
         recommendation_reason,
@@ -186,7 +181,6 @@ seed_recommendations AS (
 )
 INSERT INTO recommendation_history (
     user_id,
-    vehicle_id,
     chrstn_mno,
     recommendation_score,
     recommendation_reason,
@@ -199,7 +193,6 @@ INSERT INTO recommendation_history (
     recommendation_type
 )
 SELECT seed_recommendations.user_id,
-       seed_recommendations.vehicle_id,
        station_refs.chrstn_mno,
        seed_recommendations.recommendation_score,
        seed_recommendations.recommendation_reason,

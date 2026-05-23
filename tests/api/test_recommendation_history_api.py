@@ -17,7 +17,6 @@ def test_create_recommendation_histories_with_multiple_stations(client):
         "/recommendation-histories",
         json={
             "user_id": 1,
-            "vehicle_id": 10,
             "user_latitude": "37.3900000",
             "user_longitude": "126.6500000",
             "vehicle_remaining_hydrogen": "32.50",
@@ -47,7 +46,6 @@ def test_create_recommendation_histories_with_multiple_stations(client):
     assert len(body) == 2
     assert [row["chrstn_mno"] for row in body] == ["REC-ST-001", "REC-ST-002"]
     assert body[0]["user_id"] == 1
-    assert body[0]["vehicle_id"] == 10
 
 
 def test_list_recommendation_histories_filters_by_user_and_station(client):
@@ -62,7 +60,6 @@ def test_list_recommendation_histories_filters_by_user_and_station(client):
         "/recommendation-histories",
         json={
             "user_id": 2,
-            "vehicle_id": 20,
             "recommendations": [
                 {
                     "chrstn_mno": "REC-ST-LIST-001",

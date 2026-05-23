@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS charging_log (
     charging_log_id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    vehicle_id BIGINT NOT NULL,
     chrstn_mno VARCHAR(30) NOT NULL REFERENCES hydrogen_stations(chrstn_mno) ON DELETE CASCADE,
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP NOT NULL,
@@ -28,7 +27,6 @@ CREATE TABLE IF NOT EXISTS charging_log (
 CREATE TABLE IF NOT EXISTS recommendation_history (
     recommendation_id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    vehicle_id BIGINT NOT NULL,
     chrstn_mno VARCHAR(30) NOT NULL REFERENCES hydrogen_stations(chrstn_mno) ON DELETE CASCADE,
     recommendation_score NUMERIC(5, 2),
     recommendation_reason VARCHAR(255),
@@ -41,6 +39,9 @@ CREATE TABLE IF NOT EXISTS recommendation_history (
     recommendation_type VARCHAR(50),
     created_at TIMESTAMP DEFAULT now()
 );
+
+ALTER TABLE charging_log DROP COLUMN IF EXISTS vehicle_id;
+ALTER TABLE recommendation_history DROP COLUMN IF EXISTS vehicle_id;
 
 INSERT INTO users (
     user_id,
@@ -74,7 +75,6 @@ WHERE user_id IN (1, 2, 3, 4)
 
 INSERT INTO charging_log (
     user_id,
-    vehicle_id,
     chrstn_mno,
     start_time,
     end_time,
@@ -82,11 +82,11 @@ INSERT INTO charging_log (
     charging_cost,
     waiting_time
 ) VALUES
-(1, 101, 'DUMMY-ICN-002', '2026-05-22 08:10:00', '2026-05-22 08:24:00', 3.80, 36860.00, 0),
-(1, 101, 'DUMMY-ICN-001', '2026-05-21 18:20:00', '2026-05-21 18:39:00', 4.10, 40590.00, 3),
-(2, 201, 'DUMMY-ICN-003', '2026-05-21 09:05:00', '2026-05-21 09:31:00', 5.20, 49920.00, 8),
-(3, 301, 'DUMMY-SEOUL-001', '2026-05-20 14:00:00', '2026-05-20 14:18:00', 3.40, 34340.00, 2),
-(4, 401, 'DUMMY-GYEONGGI-001', '2026-05-19 11:30:00', '2026-05-19 11:52:00', 4.80, 47040.00, 4);
+(1, 'DUMMY-ICN-002', '2026-05-22 08:10:00', '2026-05-22 08:24:00', 3.80, 36860.00, 0),
+(1, 'DUMMY-ICN-001', '2026-05-21 18:20:00', '2026-05-21 18:39:00', 4.10, 40590.00, 3),
+(2, 'DUMMY-ICN-003', '2026-05-21 09:05:00', '2026-05-21 09:31:00', 5.20, 49920.00, 8),
+(3, 'DUMMY-SEOUL-001', '2026-05-20 14:00:00', '2026-05-20 14:18:00', 3.40, 34340.00, 2),
+(4, 'DUMMY-GYEONGGI-001', '2026-05-19 11:30:00', '2026-05-19 11:52:00', 4.80, 47040.00, 4);
 
 DELETE FROM recommendation_history
 WHERE user_id IN (1, 2, 3, 4)
@@ -100,7 +100,6 @@ WHERE user_id IN (1, 2, 3, 4)
 
 INSERT INTO recommendation_history (
     user_id,
-    vehicle_id,
     chrstn_mno,
     recommendation_score,
     recommendation_reason,
@@ -112,10 +111,10 @@ INSERT INTO recommendation_history (
     selected_at,
     recommendation_type
 ) VALUES
-(1, 101, 'DUMMY-ICN-002', 96.50, '인천 주소지 중 대기 차량이 가장 적고 영업중입니다.', 37.3920000, 126.6510000, 32.50, 8, true, '2026-05-22 08:00:00', 'LOW_WAIT'),
-(1, 101, 'DUMMY-ICN-001', 88.00, '영업중이며 공항 접근성이 좋습니다.', 37.4605000, 126.4510000, 32.50, 18, false, NULL, 'NEARBY'),
-(2, 201, 'DUMMY-ICN-003', 72.00, '영업중이나 대기 차량이 많습니다.', 37.4050000, 126.7210000, 18.20, 12, false, NULL, 'LOW_DISTANCE'),
-(3, 301, 'DUMMY-SEOUL-001', 84.20, '서울 지역 비교 추천 데이터입니다.', 37.5705000, 126.8810000, 41.00, 15, true, '2026-05-20 13:50:00', 'NEARBY'),
-(4, 401, 'DUMMY-GYEONGGI-001', 45.00, '점검중 상태라 추천 우선순위가 낮습니다.', 37.3910000, 127.1120000, 12.00, 20, false, NULL, 'STATUS_PENALTY');
+(1, 'DUMMY-ICN-002', 96.50, '인천 주소지 중 대기 차량이 가장 적고 영업중입니다.', 37.3920000, 126.6510000, 32.50, 8, true, '2026-05-22 08:00:00', 'LOW_WAIT'),
+(1, 'DUMMY-ICN-001', 88.00, '영업중이며 공항 접근성이 좋습니다.', 37.4605000, 126.4510000, 32.50, 18, false, NULL, 'NEARBY'),
+(2, 'DUMMY-ICN-003', 72.00, '영업중이나 대기 차량이 많습니다.', 37.4050000, 126.7210000, 18.20, 12, false, NULL, 'LOW_DISTANCE'),
+(3, 'DUMMY-SEOUL-001', 84.20, '서울 지역 비교 추천 데이터입니다.', 37.5705000, 126.8810000, 41.00, 15, true, '2026-05-20 13:50:00', 'NEARBY'),
+(4, 'DUMMY-GYEONGGI-001', 45.00, '점검중 상태라 추천 우선순위가 낮습니다.', 37.3910000, 127.1120000, 12.00, 20, false, NULL, 'STATUS_PENALTY');
 
 COMMIT;

@@ -12,7 +12,6 @@ async def create_charging_logs(
     rows = [
         ChargingLog(
             user_id=payload.user_id,
-            vehicle_id=payload.vehicle_id,
             chrstn_mno=log.chrstn_mno,
             start_time=log.start_time,
             end_time=log.end_time,
@@ -35,7 +34,6 @@ async def get_charging_logs(
     db: AsyncSession,
     charging_log_id: int | None = None,
     user_id: int | None = None,
-    vehicle_id: int | None = None,
     chrstn_mno: str | None = None,
     limit: int = 100,
     offset: int = 0,
@@ -46,8 +44,6 @@ async def get_charging_logs(
         query = query.where(ChargingLog.charging_log_id == charging_log_id)
     if user_id is not None:
         query = query.where(ChargingLog.user_id == user_id)
-    if vehicle_id is not None:
-        query = query.where(ChargingLog.vehicle_id == vehicle_id)
     if chrstn_mno is not None:
         query = query.where(ChargingLog.chrstn_mno == chrstn_mno)
 

@@ -15,7 +15,6 @@ class ChargingLogItemCreate(BaseModel):
 
 class ChargingLogCreate(BaseModel):
     user_id: int
-    vehicle_id: int
     logs: list[ChargingLogItemCreate] = Field(min_length=1)
 
 
@@ -24,7 +23,6 @@ class ChargingLogResponse(BaseModel):
 
     charging_log_id: int
     user_id: int
-    vehicle_id: int
     chrstn_mno: str
     start_time: datetime
     end_time: datetime

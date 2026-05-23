@@ -25,7 +25,6 @@ async def create_recommendation_histories(
 async def list_recommendation_histories(
     recommendation_id: int | None = None,
     user_id: int | None = None,
-    vehicle_id: int | None = None,
     chrstn_mno: str | None = None,
     selected: bool | None = None,
     recommendation_type: str | None = None,
@@ -36,7 +35,6 @@ async def list_recommendation_histories(
     return await RecommendationHistoryService(db).get_recommendation_histories(
         recommendation_id=recommendation_id,
         user_id=user_id,
-        vehicle_id=vehicle_id,
         chrstn_mno=chrstn_mno,
         selected=selected,
         recommendation_type=recommendation_type,

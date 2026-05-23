@@ -9,7 +9,6 @@ class ChargingLog(Base):
 
     charging_log_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, nullable=False)
-    vehicle_id = Column(Integer, nullable=False)
     chrstn_mno = Column(
         String(30),
         ForeignKey("hydrogen_stations.chrstn_mno", ondelete="CASCADE"),

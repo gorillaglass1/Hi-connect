@@ -20,7 +20,6 @@ async def create_charging_logs(
 async def list_charging_logs(
     charging_log_id: int | None = None,
     user_id: int | None = None,
-    vehicle_id: int | None = None,
     chrstn_mno: str | None = None,
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
@@ -29,7 +28,6 @@ async def list_charging_logs(
     return await ChargingLogService(db).get_charging_logs(
         charging_log_id=charging_log_id,
         user_id=user_id,
-        vehicle_id=vehicle_id,
         chrstn_mno=chrstn_mno,
         limit=limit,
         offset=offset,

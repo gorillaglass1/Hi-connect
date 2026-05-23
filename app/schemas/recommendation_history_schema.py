@@ -16,7 +16,6 @@ class RecommendationStationCreate(BaseModel):
 
 class RecommendationHistoryCreate(BaseModel):
     user_id: int
-    vehicle_id: int
     user_latitude: Decimal | None = Field(default=None)
     user_longitude: Decimal | None = Field(default=None)
     vehicle_remaining_hydrogen: Decimal | None = Field(default=None)
@@ -28,7 +27,6 @@ class RecommendationHistoryResponse(BaseModel):
 
     recommendation_id: int
     user_id: int
-    vehicle_id: int
     chrstn_mno: str
     recommendation_score: Decimal | None = Field(default=None)
     recommendation_reason: str | None = Field(default=None)

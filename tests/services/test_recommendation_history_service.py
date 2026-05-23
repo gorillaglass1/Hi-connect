@@ -30,7 +30,6 @@ async def test_create_recommendation_histories_returns_list(db_session):
     ).create_recommendation_histories(
         RecommendationHistoryCreate(
             user_id=3,
-            vehicle_id=30,
             recommendations=[
                 RecommendationStationCreate(
                     chrstn_mno="REC-SVC-001",

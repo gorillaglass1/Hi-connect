@@ -12,7 +12,6 @@ async def create_recommendation_histories(
     rows = [
         RecommendationHistory(
             user_id=payload.user_id,
-            vehicle_id=payload.vehicle_id,
             chrstn_mno=recommendation.chrstn_mno,
             recommendation_score=recommendation.recommendation_score,
             recommendation_reason=recommendation.recommendation_reason,
@@ -39,7 +38,6 @@ async def get_recommendation_histories(
     db: AsyncSession,
     recommendation_id: int | None = None,
     user_id: int | None = None,
-    vehicle_id: int | None = None,
     chrstn_mno: str | None = None,
     selected: bool | None = None,
     recommendation_type: str | None = None,
@@ -52,8 +50,6 @@ async def get_recommendation_histories(
         query = query.where(RecommendationHistory.recommendation_id == recommendation_id)
     if user_id is not None:
         query = query.where(RecommendationHistory.user_id == user_id)
-    if vehicle_id is not None:
-        query = query.where(RecommendationHistory.vehicle_id == vehicle_id)
     if chrstn_mno is not None:
         query = query.where(RecommendationHistory.chrstn_mno == chrstn_mno)
     if selected is not None:

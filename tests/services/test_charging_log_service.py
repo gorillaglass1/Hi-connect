@@ -25,7 +25,6 @@ async def test_create_charging_logs_returns_list(db_session):
     rows = await ChargingLogService(db_session).create_charging_logs(
         ChargingLogCreate(
             user_id=3,
-            vehicle_id=30,
             logs=[
                 ChargingLogItemCreate(
                     chrstn_mno="LOG-SVC-001",
