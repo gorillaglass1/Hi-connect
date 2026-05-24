@@ -14,7 +14,9 @@ def test_dashboard_page_serves_learning_test_ui(client):
     assert "recommendations/personalized/delivery-payloads" in response.text
     assert "preferences/learn" in response.text
     assert "경로안내" in response.text
+    assert "선택 학습이 완료되었습니다." in response.text
     assert "차량 전송용 추천 JSON" not in response.text
+    assert "successModal" not in response.text
 
 
 def test_promo_hero_asset_is_served(client):

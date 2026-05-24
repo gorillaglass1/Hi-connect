@@ -1,5 +1,6 @@
 import httpx
 import pytest
+from fastapi import HTTPException
 
 from app.services.hying_client import HyingClient
 
@@ -41,3 +42,44 @@ async def test_hying_client_sends_api_key_as_authorization_header(monkeypatch):
     assert FakeAsyncClient.request_params == {"pageNo": 1}
     assert FakeAsyncClient.request_headers["Authorization"] == "test-key"
     assert "serviceKey" not in FakeAsyncClient.request_params
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        ([{"chrstn_mno": "A"}, "skip", {"chrstn_mno": "B"}], [{"chrstn_mno": "A"}, {"chrstn_mno": "B"}]),
+        ({"chrstn_mno": "ROOT"}, [{"chrstn_mno": "ROOT"}]),
+        ({"items": [{"chrstn_mno": "ITEM"}]}, [{"chrstn_mno": "ITEM"}]),
+        ({"response": {"body": {"items": [{"chrstn_mno": "NESTED"}]}}}, [{"chrstn_mno": "NESTED"}]),
+        ("not-json-object", []),
+        ({"items": []}, []),
+    ],
+)
+def test_hying_client_extract_items_handles_supported_payload_shapes(payload, expected):
+    client = HyingClient(base_url="https://example.com")
+
+    assert client._extract_items(payload) == expected
+
+
+@pytest.mark.asyncio
+async def test_hying_client_requires_base_url_and_endpoint(monkeypatch):
+    monkeypatch.delenv("HYING_STATIONS_ENDPOINT", raising=False)
+    client = HyingClient(base_url="", api_key=None)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await client.fetch_stations()
+
+    assert exc_info.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_hying_facilities_request_ignores_params(monkeypatch):
+    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setenv("HYING_STATION_FACILITIES_ENDPOINT", "/facilities")
+    FakeAsyncClient.request_params = {"stale": True}
+
+    client = HyingClient(base_url="https://example.com", api_key=None)
+    result = await client.fetch_station_facilities({"pageNo": 99})
+
+    assert result == [{"chrstn_mno": "ST-001"}]
+    assert FakeAsyncClient.request_params == {}

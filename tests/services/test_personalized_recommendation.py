@@ -17,6 +17,7 @@ from app.services.hydrogen_station_service import HydrogenStationService
 from app.services.recommendation_history_service import RecommendationHistoryService
 from app.services.user_preference_service import UserPreferenceService
 from app.services.recommendation_service import RecommendationService
+from app.services.recommendation_service import haversine_distance
 
 
 @pytest.mark.asyncio
@@ -243,3 +244,190 @@ async def test_learning_requires_server_side_score_snapshot(db_session):
         chrstn_mno="LEARN-SVC-ST-002",
     )
     assert histories[0].selected is False
+
+
+def test_haversine_distance_returns_zero_for_same_coordinate():
+    assert haversine_distance(37.405, 126.721, 37.405, 126.721) == 0
+
+
+def test_haversine_distance_matches_known_short_route_distance():
+    distance = haversine_distance(37.405, 126.721, 37.460, 126.450)
+
+    assert round(distance, 1) == 24.7
+
+
+@pytest.mark.asyncio
+async def test_personalized_recommendation_returns_empty_when_no_active_stations(
+    db_session,
+    monkeypatch,
+):
+    async def use_missing_station_id(self, _nl_query):
+        return ["TEST-ST-NOT-EXISTS"]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_missing_station_id,
+    )
+    user = await UserPreferenceService(db_session).create_user(
+        UserCreate(
+            name="추천 빈 결과 사용자",
+            phone="010-7777-0001",
+            email="empty-recommendation-user@example.com",
+        )
+    )
+
+    recommendations = await RecommendationService(
+        db_session
+    ).get_personalized_recommendations(
+        RecommendationSearchRequest(
+            user_id=user.user_id,
+            current_latitude=Decimal("37.4050"),
+            current_longitude=Decimal("126.7210"),
+            destination_latitude=Decimal("37.4600"),
+            destination_longitude=Decimal("126.4500"),
+            remaining_range=Decimal("45.0"),
+            alpha=Decimal("15.0"),
+            nl_query="없는 충전소만",
+        )
+    )
+
+    assert recommendations == []
+
+
+@pytest.mark.asyncio
+async def test_personalized_recommendation_penalizes_unreachable_station(
+    db_session,
+    monkeypatch,
+):
+    async def use_unreachable_test_station(self, _nl_query):
+        return ["TEST-ST-UNREACHABLE"]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_unreachable_test_station,
+    )
+    user = await UserPreferenceService(db_session).create_user(
+        UserCreate(
+            name="도달 불가 추천 사용자",
+            phone="010-7777-0002",
+            email="unreachable-recommendation-user@example.com",
+        )
+    )
+    await HydrogenStationService(db_session).create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="TEST-ST-UNREACHABLE",
+            chrstn_nm="도달 불가 충전소",
+            ntsl_pc=9500,
+            let=Decimal("37.4100"),
+            lon=Decimal("126.7000"),
+            oper_yn="Y",
+        )
+    )
+
+    recommendations = await RecommendationService(
+        db_session
+    ).get_personalized_recommendations(
+        RecommendationSearchRequest(
+            user_id=user.user_id,
+            current_latitude=Decimal("37.4050"),
+            current_longitude=Decimal("126.7210"),
+            destination_latitude=Decimal("37.4600"),
+            destination_longitude=Decimal("126.4500"),
+            remaining_range=Decimal("1.0"),
+            alpha=Decimal("15.0"),
+        )
+    )
+
+    assert len(recommendations) == 1
+    assert recommendations[0].is_reachable is False
+    assert recommendations[0].final_score < 10
+    assert "초과" in recommendations[0].recommendation_reason
+
+
+@pytest.mark.asyncio
+async def test_learning_uses_client_score_fallback_when_history_has_no_snapshot(
+    db_session,
+):
+    service = UserPreferenceService(db_session)
+    user = await service.create_user(
+        UserCreate(
+            name="클라이언트 점수 학습 사용자",
+            phone="010-7777-0003",
+            email="client-score-learning-user@example.com",
+        )
+    )
+    await HydrogenStationService(db_session).create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="LEARN-SVC-ST-CLIENT",
+            chrstn_nm="클라이언트 점수 충전소",
+        )
+    )
+    await RecommendationHistoryService(db_session).create_recommendation_histories(
+        RecommendationHistoryCreate(
+            user_id=user.user_id,
+            recommendations=[
+                RecommendationStationCreate(
+                    chrstn_mno="LEARN-SVC-ST-CLIENT",
+                    recommendation_score=Decimal("80.0"),
+                )
+            ],
+        )
+    )
+
+    updated_pref = await service.learn_from_selected_recommendation(
+        user.user_id,
+        UserPreferenceLearningRequest(
+            chrstn_mno="LEARN-SVC-ST-CLIENT",
+            price_score=Decimal("100"),
+            waiting_time_score=Decimal("0"),
+            distance_score=Decimal("0"),
+            facilities_score=Decimal("0"),
+        ),
+    )
+
+    assert updated_pref.weight_price == Decimal("1.30")
+    assert updated_pref.weight_waiting_time == Decimal("0.90")
+    assert updated_pref.weight_distance == Decimal("0.90")
+    assert updated_pref.weight_facilities == Decimal("0.90")
+
+
+@pytest.mark.asyncio
+async def test_learning_rejects_partial_client_score_fallback(db_session):
+    service = UserPreferenceService(db_session)
+    user = await service.create_user(
+        UserCreate(
+            name="부분 점수 학습 사용자",
+            phone="010-7777-0004",
+            email="partial-score-learning-user@example.com",
+        )
+    )
+    await HydrogenStationService(db_session).create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="LEARN-SVC-ST-PARTIAL",
+            chrstn_nm="부분 점수 충전소",
+        )
+    )
+    await RecommendationHistoryService(db_session).create_recommendation_histories(
+        RecommendationHistoryCreate(
+            user_id=user.user_id,
+            recommendations=[
+                RecommendationStationCreate(
+                    chrstn_mno="LEARN-SVC-ST-PARTIAL",
+                    recommendation_score=Decimal("80.0"),
+                )
+            ],
+        )
+    )
+
+    with pytest.raises(Exception) as exc_info:
+        await service.learn_from_selected_recommendation(
+            user.user_id,
+            UserPreferenceLearningRequest(
+                chrstn_mno="LEARN-SVC-ST-PARTIAL",
+                price_score=Decimal("100"),
+            ),
+        )
+
+    assert getattr(exc_info.value, "status_code", None) == 422
