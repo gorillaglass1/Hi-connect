@@ -19,7 +19,6 @@ def test_build_delivery_payload_contains_stable_external_contract():
         is_reachable=True,
         final_score=94.2,
         recommendation_reason="사용자 가중치 분석 결과 전반적 매칭도가 매우 높습니다.",
-        hyundai_nav_deeplink="hyundainav://route?dest_lat=37.46",
     )
 
     assert payload.chrstn_mno == "REC-ST-001"
@@ -34,4 +33,4 @@ def test_build_delivery_payload_contains_stable_external_contract():
     assert payload.facilities == ["편의점"]
     assert payload.is_reachable is True
     assert payload.final_score == 94.2
-    assert payload.hyundai_nav_deeplink.startswith("hyundainav://route")
+    assert not hasattr(payload, "hyundai_nav_deeplink")

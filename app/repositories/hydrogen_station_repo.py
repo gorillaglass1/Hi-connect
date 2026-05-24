@@ -1,6 +1,6 @@
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager, joinedload
+from sqlalchemy.orm import contains_eager, joinedload, selectinload
 
 from app.models.hydrogen_station_facilities import HydrogenStationAdditionalInfo
 from app.models.hydrogen_station_status import HydrogenStationStatus
@@ -168,6 +168,27 @@ async def get_hydrogen_station_details(
     ).limit(limit).offset(offset)
     result = await db.execute(query)
     return list(result.unique().scalars().all())
+
+
+async def get_active_hydrogen_stations_for_recommendation(
+    db: AsyncSession,
+    candidate_station_ids: list[str] | None = None,
+) -> list[HydrogenStation]:
+    query = (
+        select(HydrogenStation)
+        .where(HydrogenStation.oper_yn == "Y")
+        .where(HydrogenStation.del_at == "0")
+        .options(
+            selectinload(HydrogenStation.status_list),
+            selectinload(HydrogenStation.facilities_list),
+        )
+    )
+
+    if candidate_station_ids is not None:
+        query = query.where(HydrogenStation.chrstn_mno.in_(candidate_station_ids))
+
+    result = await db.execute(query)
+    return list(result.scalars().all())
 
 
 async def upsert_hydrogen_stations(

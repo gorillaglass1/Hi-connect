@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS recommendation_history (
     chrstn_mno VARCHAR(30) NOT NULL REFERENCES hydrogen_stations(chrstn_mno) ON DELETE CASCADE,
     recommendation_score NUMERIC(5, 2),
     recommendation_reason VARCHAR(255),
+    price_score NUMERIC(5, 2),
+    waiting_time_score NUMERIC(5, 2),
+    distance_score NUMERIC(5, 2),
+    facilities_score NUMERIC(5, 2),
     user_latitude NUMERIC(10, 7),
     user_longitude NUMERIC(10, 7),
     vehicle_remaining_hydrogen NUMERIC(6, 2),
@@ -42,6 +46,10 @@ CREATE TABLE IF NOT EXISTS recommendation_history (
 
 ALTER TABLE charging_log DROP COLUMN IF EXISTS vehicle_id;
 ALTER TABLE recommendation_history DROP COLUMN IF EXISTS vehicle_id;
+ALTER TABLE recommendation_history ADD COLUMN IF NOT EXISTS price_score NUMERIC(5, 2);
+ALTER TABLE recommendation_history ADD COLUMN IF NOT EXISTS waiting_time_score NUMERIC(5, 2);
+ALTER TABLE recommendation_history ADD COLUMN IF NOT EXISTS distance_score NUMERIC(5, 2);
+ALTER TABLE recommendation_history ADD COLUMN IF NOT EXISTS facilities_score NUMERIC(5, 2);
 
 INSERT INTO users (
     user_id,
@@ -103,6 +111,10 @@ INSERT INTO recommendation_history (
     chrstn_mno,
     recommendation_score,
     recommendation_reason,
+    price_score,
+    waiting_time_score,
+    distance_score,
+    facilities_score,
     user_latitude,
     user_longitude,
     vehicle_remaining_hydrogen,
@@ -111,10 +123,10 @@ INSERT INTO recommendation_history (
     selected_at,
     recommendation_type
 ) VALUES
-(1, 'DUMMY-ICN-002', 96.50, '인천 주소지 중 대기 차량이 가장 적고 영업중입니다.', 37.3920000, 126.6510000, 32.50, 8, true, '2026-05-22 08:00:00', 'LOW_WAIT'),
-(1, 'DUMMY-ICN-001', 88.00, '영업중이며 공항 접근성이 좋습니다.', 37.4605000, 126.4510000, 32.50, 18, false, NULL, 'NEARBY'),
-(2, 'DUMMY-ICN-003', 72.00, '영업중이나 대기 차량이 많습니다.', 37.4050000, 126.7210000, 18.20, 12, false, NULL, 'LOW_DISTANCE'),
-(3, 'DUMMY-SEOUL-001', 84.20, '서울 지역 비교 추천 데이터입니다.', 37.5705000, 126.8810000, 41.00, 15, true, '2026-05-20 13:50:00', 'NEARBY'),
-(4, 'DUMMY-GYEONGGI-001', 45.00, '점검중 상태라 추천 우선순위가 낮습니다.', 37.3910000, 127.1120000, 12.00, 20, false, NULL, 'STATUS_PENALTY');
+(1, 'DUMMY-ICN-002', 96.50, '인천 주소지 중 대기 차량이 가장 적고 영업중입니다.', 45.00, 100.00, 92.00, 75.00, 37.3920000, 126.6510000, 32.50, 8, true, '2026-05-22 08:00:00', 'LOW_WAIT'),
+(1, 'DUMMY-ICN-001', 88.00, '영업중이며 공항 접근성이 좋습니다.', 60.00, 80.00, 95.00, 50.00, 37.4605000, 126.4510000, 32.50, 18, false, NULL, 'NEARBY'),
+(2, 'DUMMY-ICN-003', 72.00, '영업중이나 대기 차량이 많습니다.', 70.00, 35.00, 85.00, 25.00, 37.4050000, 126.7210000, 18.20, 12, false, NULL, 'LOW_DISTANCE'),
+(3, 'DUMMY-SEOUL-001', 84.20, '서울 지역 비교 추천 데이터입니다.', 55.00, 90.00, 82.00, 75.00, 37.5705000, 126.8810000, 41.00, 15, true, '2026-05-20 13:50:00', 'NEARBY'),
+(4, 'DUMMY-GYEONGGI-001', 45.00, '점검중 상태라 추천 우선순위가 낮습니다.', 30.00, 20.00, 40.00, 25.00, 37.3910000, 127.1120000, 12.00, 20, false, NULL, 'STATUS_PENALTY');
 
 COMMIT;

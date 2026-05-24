@@ -2,8 +2,6 @@ from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.recommendation_schema import SubScores
-
 
 class UserPreferenceBase(BaseModel):
     weight_price: Decimal = Field(default=Decimal("1.0"), description="가격 가중치")
@@ -19,7 +17,6 @@ class UserPreferenceUpdate(UserPreferenceBase):
 
 class UserPreferenceLearningRequest(BaseModel):
     chrstn_mno: str = Field(..., min_length=1, description="사용자가 선택한 충전소 관리번호")
-    sub_scores: SubScores = Field(..., description="선택된 충전소의 추천 세부 점수")
 
 
 class UserCreate(BaseModel):

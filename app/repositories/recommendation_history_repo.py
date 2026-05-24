@@ -17,6 +17,10 @@ async def create_recommendation_histories(
             chrstn_mno=recommendation.chrstn_mno,
             recommendation_score=recommendation.recommendation_score,
             recommendation_reason=recommendation.recommendation_reason,
+            price_score=recommendation.price_score,
+            waiting_time_score=recommendation.waiting_time_score,
+            distance_score=recommendation.distance_score,
+            facilities_score=recommendation.facilities_score,
             user_latitude=payload.user_latitude,
             user_longitude=payload.user_longitude,
             vehicle_remaining_hydrogen=payload.vehicle_remaining_hydrogen,
@@ -70,7 +74,7 @@ async def get_recommendation_histories(
     return list(result.scalars().all())
 
 
-async def mark_latest_recommendation_selected(
+async def get_latest_recommendation_history(
     db: AsyncSession,
     *,
     user_id: int,
@@ -83,10 +87,13 @@ async def mark_latest_recommendation_selected(
         .order_by(RecommendationHistory.recommendation_id.desc())
         .limit(1)
     )
-    row = result.scalar_one_or_none()
-    if row is None:
-        return None
+    return result.scalar_one_or_none()
 
+
+async def mark_recommendation_selected(
+    db: AsyncSession,
+    row: RecommendationHistory,
+) -> RecommendationHistory:
     row.selected = True
     row.selected_at = datetime.now()
     await db.commit()

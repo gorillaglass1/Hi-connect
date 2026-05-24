@@ -721,26 +721,6 @@
         .json-block span.str { color: var(--accent-emerald); }
         .json-block span.num { color: var(--accent-amber); }
 
-        .deeplink-display {
-            background: rgba(84, 240, 208, 0.07);
-            border: 1px solid rgba(84, 240, 208, 0.18);
-            border-radius: 12px;
-            padding: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-        }
-
-        .deeplink-text {
-            font-size: 0.8rem;
-            font-family: 'Courier New', Courier, monospace;
-            color: var(--primary-blue);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
         @media (max-width: 1320px) {
             .dashboard-container {
                 grid-template-columns: minmax(280px, 0.9fr) minmax(520px, 1.4fr);
@@ -1014,11 +994,6 @@
                     <!-- Dynamic JSON will go here -->
                 </div>
 
-                <h4 style="font-size: 0.9rem; font-weight: 700; color: var(--accent-cyan);">현대차 내비 딥링크 URL</h4>
-                <div class="deeplink-display">
-                    <span class="deeplink-text" id="deeplinkText">hyundainav://route?dest_lat=...</span>
-            <button class="btn btn-secondary" style="width: auto; padding: 8px 12px; font-size: 0.8rem;" onclick="copyDeeplink()"><i class="fa-solid fa-copy"></i> 복사</button>
-                </div>
             </div>
         </div>
     </div>
@@ -1378,7 +1353,7 @@
             };
 
             try {
-                const res = await fetch("/recommendations/personalized", {
+                const res = await fetch("/recommendations/personalized/delivery-payloads", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
@@ -1387,24 +1362,24 @@
                 document.getElementById("loadingIndicator").style.display = "none";
 
                 if (res.ok) {
-                    const stations = await res.json();
-                    stationsList = stations;
+                    const vehiclePayloads = await res.json();
+                    stationsList = vehiclePayloads;
                     
-                    if (stations.length === 0) {
+                    if (vehiclePayloads.length === 0) {
                         document.getElementById("emptyMessage").style.display = "block";
                         document.getElementById("emptyMessage").innerHTML = "<i class='fa-solid fa-circle-exclamation' style='font-size: 2rem; color: var(--accent-rose); margin-bottom:10px;'></i><br>검색 반경 내에 혹은 자연어 필터 조건에 매칭되는 수소충전소가 존재하지 않습니다.";
                         logTerminal(`Search returned 0 results.`, "warning");
                         return;
                     }
 
-                    logTerminal(`Optimal Multi-Objective optimization complete. Ranked ${stations.length} stations.`, "success");
+                    logTerminal(`Vehicle payload optimization complete. Prepared ${vehiclePayloads.length} station payloads.`, "success");
                     
                     // Render SQL logs inside retro terminal if AI was enabled
                     if (isAiEnabled && nlQuery) {
                         logTerminal(`Gemini Text-to-SQL translated query successfully. Executed safe PostgreSQL search.`, "success");
                     }
 
-                    renderStationList(stations);
+                    renderStationList(vehiclePayloads);
                 } else {
                     document.getElementById("emptyMessage").style.display = "block";
                     document.getElementById("emptyMessage").innerText = "오류 발생! API 요청이 실패했습니다.";
@@ -1418,49 +1393,49 @@
             }
         }
 
-        function renderStationList(stations) {
+        function renderStationList(vehiclePayloads) {
             const listContainer = document.getElementById("recommendationResults");
             listContainer.innerHTML = "";
 
-            stations.forEach(st => {
-                const reachableBadge = st.is_reachable 
+            vehiclePayloads.forEach(vehiclePayload => {
+                const reachableBadge = vehiclePayload.is_reachable
                     ? `<span class="badge badge-reachable"><i class="fa-solid fa-circle-check"></i> 도달 가능</span>` 
                     : `<span class="badge badge-unreachable"><i class="fa-solid fa-triangle-exclamation"></i> 도달 불가능 (충전 필요)</span>`;
 
-                const priceText = st.ntsl_pc 
-                    ? `<span class="highlight">${st.ntsl_pc.toLocaleString()}원</span>/kg` 
+                const priceText = vehiclePayload.ntsl_pc
+                    ? `<span class="highlight">${vehiclePayload.ntsl_pc.toLocaleString()}원</span>/kg`
                     : "<span class='highlight'>정보 없음</span>";
 
-                const facTags = st.facilities.map(f => `<span class="facility-tag">${f}</span>`).join(" ");
+                const facTags = vehiclePayload.facilities.map(f => `<span class="facility-tag">${f}</span>`).join(" ");
 
                 const cardHtml = `
                     <div class="station-card">
                         <div class="score-circle">
-                            <span class="score-value">${st.final_score}</span>
+                            <span class="score-value">${vehiclePayload.final_score}</span>
                             <span class="score-label">MATCH</span>
                         </div>
                         <div class="station-details">
                             <div class="station-header">
-                                <span class="station-name">${st.chrstn_nm}</span>
+                                <span class="station-name">${vehiclePayload.chrstn_nm}</span>
                                 ${reachableBadge}
-                                <span class="badge badge-info">${st.distance_to_station} km</span>
+                                <span class="badge badge-info">${vehiclePayload.distance_to_station} km</span>
                             </div>
                             <div class="station-address">
-                                <i class="fa-solid fa-location-dot"></i> ${st.road_nm_addr}
+                                <i class="fa-solid fa-location-dot"></i> ${vehiclePayload.road_nm_addr || "주소 정보 없음"}
                             </div>
                             <div class="station-stats">
                                 <div class="stat-item"><i class="fa-solid fa-won-sign"></i> 가격: ${priceText}</div>
-                                <div class="stat-item"><i class="fa-solid fa-clock"></i> 대기: <span class="highlight">${st.wait_vehicles}대</span> (${st.wait_time_minutes}분 소요)</div>
-                                <div class="stat-item"><i class="fa-solid fa-route"></i> 우회: <span class="highlight">${st.detour_distance} km</span></div>
+                                <div class="stat-item"><i class="fa-solid fa-clock"></i> 대기: <span class="highlight">${vehiclePayload.wait_vehicles}대</span> (${vehiclePayload.wait_time_minutes}분 소요)</div>
+                                <div class="stat-item"><i class="fa-solid fa-route"></i> 우회: <span class="highlight">${vehiclePayload.detour_distance} km</span></div>
                             </div>
                             <div class="station-reason">
                                 <i class="fa-solid fa-quote-left" style="font-size: 0.65rem; vertical-align: top; margin-right: 4px;"></i>
-                                ${st.recommendation_reason}
+                                ${vehiclePayload.recommendation_reason}
                             </div>
                             ${facTags ? `<div class="station-facilities">${facTags}</div>` : ""}
                         </div>
                         <div class="station-action">
-                            <button class="btn btn-nav-push" data-chrstn-mno="${st.chrstn_mno}">
+                            <button class="btn btn-nav-push" data-chrstn-mno="${vehiclePayload.chrstn_mno}">
                                 <i class="fa-solid fa-route"></i> 경로안내
                             </button>
                         </div>
@@ -1478,17 +1453,16 @@
 
         async function pushWaypoint(chrstnMno) {
             const userId = document.getElementById("userSelector").value;
-            const selectedStation = stationsList.find(st => st.chrstn_mno === chrstnMno);
-            if (!selectedStation) {
+            const selectedPayload = stationsList.find(st => st.chrstn_mno === chrstnMno);
+            if (!selectedPayload) {
                 logTerminal(`Selected station was not found in the latest recommendation list.`, "warning");
                 return;
             }
 
-            logTerminal(`Route guidance selected for ${selectedStation.chrstn_nm}. Updating preference weights...`);
+            logTerminal(`Route guidance selected for ${selectedPayload.chrstn_nm}. Updating preference weights...`);
 
             const learningPayload = {
-                chrstn_mno: selectedStation.chrstn_mno,
-                sub_scores: selectedStation.sub_scores
+                chrstn_mno: selectedPayload.chrstn_mno
             };
 
             try {
@@ -1505,8 +1479,8 @@
                     setSlider("weightDistance", "weightDistanceVal", updatedPreference.weight_distance);
                     setSlider("weightFacilities", "weightFacilitiesVal", updatedPreference.weight_facilities);
                     setSlider("safetyMargin", "safetyMarginVal", updatedPreference.safety_margin);
-                    logTerminal(`Preference weights updated from selected station scores.`, "success");
-                    showModal(selectedStation.delivery_payload);
+                    logTerminal(`Preference weights updated from server-side recommendation history.`, "success");
+                    showModal(selectedPayload);
                 } else {
                     logTerminal(`Preference learning failed. status: ${res.status}`, "warning");
                     alert("선택 학습 처리에 실패했습니다.");
@@ -1518,7 +1492,6 @@
 
         function showModal(vehiclePayload) {
             const modal = document.getElementById("successModal");
-            document.getElementById("deeplinkText").innerText = vehiclePayload.hyundai_nav_deeplink;
             
             // Format JSON nicely
             const jsonStr = JSON.stringify(vehiclePayload, null, 2);
@@ -1535,11 +1508,6 @@
             document.getElementById("successModal").style.display = "none";
         }
 
-        function copyDeeplink() {
-            const txt = document.getElementById("deeplinkText").innerText;
-            navigator.clipboard.writeText(txt);
-            alert("현대차 내비 딥링크 URL이 클립보드에 복사되었습니다!");
-        }
     </script>
 </body>
 </html>

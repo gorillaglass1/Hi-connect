@@ -69,18 +69,20 @@ def test_personalized_recommendation_returns_delivery_payload(client, monkeypatc
         },
     )
 
+    request_payload = {
+        "user_id": user_id,
+        "current_latitude": 37.405,
+        "current_longitude": 126.721,
+        "destination_latitude": 37.46,
+        "destination_longitude": 126.45,
+        "remaining_range": 45,
+        "alpha": 15,
+        "nl_query": "인천에 있고 대기 차량이 적은 충전소",
+    }
+
     res = client.post(
         "/recommendations/personalized",
-        json={
-            "user_id": user_id,
-            "current_latitude": 37.405,
-            "current_longitude": 126.721,
-            "destination_latitude": 37.46,
-            "destination_longitude": 126.45,
-            "remaining_range": 45,
-            "alpha": 15,
-            "nl_query": "인천에 있고 대기 차량이 적은 충전소",
-        },
+        json=request_payload,
     )
 
     assert res.status_code == 200
@@ -97,6 +99,18 @@ def test_personalized_recommendation_returns_delivery_payload(client, monkeypatc
     assert top["delivery_payload"]["wait_vehicles"] == top["wait_vehicles"]
     assert top["delivery_payload"]["facilities"] == top["facilities"]
     assert top["delivery_payload"]["final_score"] == top["final_score"]
+    assert "hyundai_nav_deeplink" not in top["delivery_payload"]
+
+    vehicle_res = client.post(
+        "/recommendations/personalized/delivery-payloads",
+        json=request_payload,
+    )
+    assert vehicle_res.status_code == 200
+    vehicle_payload = vehicle_res.json()[0]
+    assert vehicle_payload["chrstn_mno"] == "API-REC-ST-001"
+    assert "delivery_payload" not in vehicle_payload
+    assert "sub_scores" not in vehicle_payload
+    assert "hyundai_nav_deeplink" not in vehicle_payload
 
 
 def test_personalized_recommendation_empty_text_to_sql_match_returns_empty_list(

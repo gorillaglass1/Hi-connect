@@ -23,7 +23,6 @@ class RecommendationDeliveryPayloadService:
         is_reachable: bool,
         final_score: float,
         recommendation_reason: str,
-        hyundai_nav_deeplink: str,
     ) -> RecommendationDeliveryPayload:
         return RecommendationDeliveryPayload(
             chrstn_mno=chrstn_mno,
@@ -40,5 +39,4 @@ class RecommendationDeliveryPayloadService:
             is_reachable=is_reachable,
             final_score=final_score,
             recommendation_reason=recommendation_reason,
-            hyundai_nav_deeplink=hyundai_nav_deeplink,
         )

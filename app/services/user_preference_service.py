@@ -4,7 +4,6 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories import recommendation_history_repo, user_preference_repo
-from app.schemas.recommendation_schema import SubScores
 from app.schemas.user_preference_schema import (
     UserCreate,
     UserPreferenceLearningRequest,
@@ -18,6 +17,13 @@ DEFAULT_WEIGHT_TOTAL = Decimal("4.00")
 MIN_WEIGHT = Decimal("0.00")
 MAX_WEIGHT = Decimal("3.00")
 WEIGHT_PRECISION = Decimal("0.01")
+DEFAULT_USER_PREFERENCES = UserPreferenceUpdate(
+    weight_price=Decimal("1.0"),
+    weight_waiting_time=Decimal("1.0"),
+    weight_distance=Decimal("1.0"),
+    weight_facilities=Decimal("1.0"),
+    safety_margin=Decimal("1.1"),
+)
 
 
 class UserPreferenceService:
@@ -34,47 +40,42 @@ class UserPreferenceService:
                 detail="User email already exists",
             )
 
-        await user_preference_repo.get_user_preferences(self.db, user.user_id)
+        await self._ensure_user_preferences(user.user_id)
         return await self.get_user(user.user_id)
 
     async def get_user_preferences(self, user_id: int) -> UserPreferenceResponse:
-        pref = await user_preference_repo.get_user_preferences(self.db, user_id)
-        if pref is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"User with ID {user_id} not found",
-            )
-        return pref
+        return await self._ensure_user_preferences(user_id)
 
     async def update_user_preferences(
         self,
         user_id: int,
         payload: UserPreferenceUpdate,
     ) -> UserPreferenceResponse:
-        pref = await user_preference_repo.update_user_preferences(
+        pref = await self._ensure_user_preferences(user_id)
+        return await user_preference_repo.update_user_preferences(
             self.db,
-            user_id,
+            pref,
             payload,
         )
-        if pref is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"User with ID {user_id} not found",
-            )
-        return pref
 
     async def learn_from_selected_recommendation(
         self,
         user_id: int,
         payload: UserPreferenceLearningRequest,
     ) -> UserPreferenceResponse:
-        pref = await user_preference_repo.get_user_preferences(self.db, user_id)
-        if pref is None:
+        pref = await self._ensure_user_preferences(user_id)
+        selected_history = await recommendation_history_repo.get_latest_recommendation_history(
+            self.db,
+            user_id=user_id,
+            chrstn_mno=payload.chrstn_mno,
+        )
+        if selected_history is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"User with ID {user_id} not found",
+                detail="Selected recommendation history was not found",
             )
 
+        score_values = _history_to_score_values(selected_history)
         current_weights = {
             "weight_price": Decimal(str(pref.weight_price)),
             "weight_waiting_time": Decimal(str(pref.weight_waiting_time)),
@@ -82,7 +83,7 @@ class UserPreferenceService:
             "weight_facilities": Decimal(str(pref.weight_facilities)),
         }
         observed_weights = _scores_to_observed_weights(
-            payload.sub_scores,
+            score_values,
             _current_weight_total(current_weights),
         )
 
@@ -108,17 +109,32 @@ class UserPreferenceService:
 
         updated_pref = await user_preference_repo.update_user_preferences(
             self.db,
-            user_id,
+            pref,
             update_payload,
         )
-        await recommendation_history_repo.mark_latest_recommendation_selected(
+        await recommendation_history_repo.mark_recommendation_selected(
             self.db,
-            user_id=user_id,
-            chrstn_mno=payload.chrstn_mno,
+            selected_history,
         )
         return updated_pref
 
     async def get_user(self, user_id: int) -> UserResponse:
+        await self._get_user_or_404(user_id)
+        await self._ensure_user_preferences(user_id)
+        return await user_preference_repo.get_user(self.db, user_id)
+
+    async def _ensure_user_preferences(self, user_id: int):
+        await self._get_user_or_404(user_id)
+        pref = await user_preference_repo.get_user_preferences(self.db, user_id)
+        if pref is not None:
+            return pref
+        return await user_preference_repo.create_user_preferences(
+            self.db,
+            user_id,
+            DEFAULT_USER_PREFERENCES,
+        )
+
+    async def _get_user_or_404(self, user_id: int):
         user = await user_preference_repo.get_user(self.db, user_id)
         if user is None:
             raise HTTPException(
@@ -134,14 +150,12 @@ def _current_weight_total(weights: dict[str, Decimal]) -> Decimal:
 
 
 def _scores_to_observed_weights(
-    scores: SubScores,
+    scores: dict[str, Decimal],
     weight_total: Decimal,
 ) -> dict[str, Decimal]:
     score_values = {
-        "weight_price": _non_negative_decimal(scores.price),
-        "weight_waiting_time": _non_negative_decimal(scores.waiting_time),
-        "weight_distance": _non_negative_decimal(scores.distance),
-        "weight_facilities": _non_negative_decimal(scores.facilities),
+        key: _non_negative_decimal(value)
+        for key, value in scores.items()
     }
     score_total = sum(score_values.values(), Decimal("0"))
     if score_total <= 0:
@@ -154,9 +168,25 @@ def _scores_to_observed_weights(
     }
 
 
-def _non_negative_decimal(value: float) -> Decimal:
+def _non_negative_decimal(value: Decimal) -> Decimal:
     decimal_value = Decimal(str(value))
     return decimal_value if decimal_value > 0 else Decimal("0")
+
+
+def _history_to_score_values(history) -> dict[str, Decimal]:
+    score_values = {
+        "weight_price": history.price_score,
+        "weight_waiting_time": history.waiting_time_score,
+        "weight_distance": history.distance_score,
+        "weight_facilities": history.facilities_score,
+    }
+    if any(value is None for value in score_values.values()):
+        raise HTTPException(
+            status_code=409,
+            detail="Selected recommendation history does not have score snapshot",
+        )
+
+    return {key: Decimal(str(value)) for key, value in score_values.items()}
 
 
 def _blend_weight(current: Decimal, observed: Decimal) -> Decimal:

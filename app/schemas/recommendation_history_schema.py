@@ -8,6 +8,10 @@ class RecommendationStationCreate(BaseModel):
     chrstn_mno: str
     recommendation_score: Decimal | None = Field(default=None)
     recommendation_reason: str | None = Field(default=None)
+    price_score: Decimal | None = Field(default=None)
+    waiting_time_score: Decimal | None = Field(default=None)
+    distance_score: Decimal | None = Field(default=None)
+    facilities_score: Decimal | None = Field(default=None)
     estimated_arrival_time: int | None = Field(default=None)
     selected: bool = Field(default=False)
     selected_at: datetime | None = Field(default=None)
@@ -30,6 +34,10 @@ class RecommendationHistoryResponse(BaseModel):
     chrstn_mno: str
     recommendation_score: Decimal | None = Field(default=None)
     recommendation_reason: str | None = Field(default=None)
+    price_score: Decimal | None = Field(default=None)
+    waiting_time_score: Decimal | None = Field(default=None)
+    distance_score: Decimal | None = Field(default=None)
+    facilities_score: Decimal | None = Field(default=None)
     user_latitude: Decimal | None = Field(default=None)
     user_longitude: Decimal | None = Field(default=None)
     vehicle_remaining_hydrogen: Decimal | None = Field(default=None)

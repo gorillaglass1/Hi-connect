@@ -155,7 +155,7 @@
       "response": []
     },
     {
-      "name": "6. 경로안내 선택 기반 선호도 학습 (POST /users/:user_id/preferences/learn)",
+      "name": "6. 차량 전송용 추천 payload 조회 (POST /recommendations/personalized/delivery-payloads)",
       "request": {
         "method": "POST",
         "header": [
@@ -166,7 +166,41 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"chrstn_mno\": \"DUMMY-ICN-001\",\n  \"sub_scores\": {\n    \"price\": 40,\n    \"waiting_time\": 90,\n    \"distance\": 85,\n    \"facilities\": 25\n  }\n}"
+          "raw": "{\n  \"user_id\": 1,\n  \"current_latitude\": 37.4050,\n  \"current_longitude\": 126.7210,\n  \"destination_latitude\": 37.4600,\n  \"destination_longitude\": 126.4500,\n  \"remaining_range\": 45.0,\n  \"alpha\": 15.0,\n  \"nl_query\": \"인천에 있고 대기 차량이 적은 충전소\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/recommendations/personalized/delivery-payloads",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "recommendations",
+            "personalized",
+            "delivery-payloads"
+          ]
+        },
+        "description": "실제 차량 적용 영역에서 쓰는 flat payload 배열만 반환합니다. 응답에는 sub_scores, 중첩 delivery_payload, hyundai_nav_deeplink가 포함되지 않습니다."
+      },
+      "response": []
+    },
+    {
+      "name": "7. 경로안내 선택 기반 선호도 학습 (POST /users/:user_id/preferences/learn)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"chrstn_mno\": \"DUMMY-ICN-001\"\n}"
         },
         "url": {
           "raw": "http://127.0.0.1:8000/users/1/preferences/learn",
@@ -185,12 +219,12 @@
             "learn"
           ]
         },
-        "description": "사용자가 추천 순위에서 경로안내를 누르면, 선택된 충전소의 세부 점수를 관측 선호도로 사용해 개인화 가중치를 10% 학습률로 조정합니다."
+        "description": "사용자가 추천 순위에서 경로안내를 누르면 충전소 관리번호만 전송합니다. 서버는 최신 추천 이력에 저장된 세부 점수를 관측 선호도로 사용해 개인화 가중치를 10% 학습률로 조정합니다."
       },
       "response": []
     },
     {
-      "name": "7. 최근 추천 이력 조회 (GET /recommendation-histories)",
+      "name": "8. 최근 추천 이력 조회 (GET /recommendation-histories)",
       "request": {
         "method": "GET",
         "header": [],

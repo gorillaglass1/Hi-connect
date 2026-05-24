@@ -35,7 +35,6 @@ class RecommendationDeliveryPayload(BaseModel):
     is_reachable: bool = Field(..., description="현재 주행가능거리 내 도달 가능 여부")
     final_score: float = Field(..., description="최종 추천 점수")
     recommendation_reason: str = Field(..., description="추천 사유")
-    hyundai_nav_deeplink: str = Field(..., description="현대 내비 경유지 딥링크")
 
 
 class RecommendedStationResponse(BaseModel):

@@ -8,8 +8,13 @@ from app.schemas.user_preference_schema import (
     UserPreferenceLearningRequest,
     UserPreferenceUpdate,
 )
-from app.schemas.recommendation_schema import RecommendationSearchRequest, SubScores
+from app.schemas.recommendation_history_schema import (
+    RecommendationHistoryCreate,
+    RecommendationStationCreate,
+)
+from app.schemas.recommendation_schema import RecommendationSearchRequest
 from app.services.hydrogen_station_service import HydrogenStationService
+from app.services.recommendation_history_service import RecommendationHistoryService
 from app.services.user_preference_service import UserPreferenceService
 from app.services.recommendation_service import RecommendationService
 
@@ -158,17 +163,32 @@ async def test_learn_from_selected_recommendation_moves_weights_gradually(db_ses
             email="learning-user@example.com",
         )
     )
+    await HydrogenStationService(db_session).create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="LEARN-SVC-ST-001",
+            chrstn_nm="학습용 충전소",
+        )
+    )
+    await RecommendationHistoryService(db_session).create_recommendation_histories(
+        RecommendationHistoryCreate(
+            user_id=user.user_id,
+            recommendations=[
+                RecommendationStationCreate(
+                    chrstn_mno="LEARN-SVC-ST-001",
+                    recommendation_score=Decimal("80.0"),
+                    price_score=Decimal("40"),
+                    waiting_time_score=Decimal("90"),
+                    distance_score=Decimal("85"),
+                    facilities_score=Decimal("25"),
+                )
+            ],
+        )
+    )
 
     updated_pref = await service.learn_from_selected_recommendation(
         user.user_id,
         UserPreferenceLearningRequest(
-            chrstn_mno="LEARN-ST-001",
-            sub_scores=SubScores(
-                price=40,
-                waiting_time=90,
-                distance=85,
-                facilities=25,
-            ),
+            chrstn_mno="LEARN-SVC-ST-001",
         ),
     )
 
@@ -176,3 +196,50 @@ async def test_learn_from_selected_recommendation_moves_weights_gradually(db_ses
     assert updated_pref.weight_waiting_time == Decimal("1.05")
     assert updated_pref.weight_distance == Decimal("1.04")
     assert updated_pref.weight_facilities == Decimal("0.94")
+
+
+@pytest.mark.asyncio
+async def test_learning_requires_server_side_score_snapshot(db_session):
+    service = UserPreferenceService(db_session)
+    user = await service.create_user(
+        UserCreate(
+            name="점수없는학습사용자",
+            phone="010-7777-9999",
+            email="missing-score-learning-user@example.com",
+        )
+    )
+    await HydrogenStationService(db_session).create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="LEARN-SVC-ST-002",
+            chrstn_nm="점수 없는 추천 이력 충전소",
+        )
+    )
+    await RecommendationHistoryService(db_session).create_recommendation_histories(
+        RecommendationHistoryCreate(
+            user_id=user.user_id,
+            recommendations=[
+                RecommendationStationCreate(
+                    chrstn_mno="LEARN-SVC-ST-002",
+                    recommendation_score=Decimal("80.0"),
+                )
+            ],
+        )
+    )
+
+    with pytest.raises(Exception) as exc_info:
+        await service.learn_from_selected_recommendation(
+            user.user_id,
+            UserPreferenceLearningRequest(
+                chrstn_mno="LEARN-SVC-ST-002",
+            ),
+        )
+
+    assert getattr(exc_info.value, "status_code", None) == 409
+
+    histories = await RecommendationHistoryService(
+        db_session
+    ).get_recommendation_histories(
+        user_id=user.user_id,
+        chrstn_mno="LEARN-SVC-ST-002",
+    )
+    assert histories[0].selected is False

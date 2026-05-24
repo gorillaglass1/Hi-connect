@@ -69,17 +69,34 @@ def test_learn_user_preferences_from_selected_recommendation(client):
         },
     )
     user_id = create_res.json()["user_id"]
+    client.post(
+        "/hydrogen-stations",
+        json={
+            "chrstn_mno": "LEARN-ST-001",
+            "chrstn_nm": "API 학습용 충전소",
+        },
+    )
+    client.post(
+        "/recommendation-histories",
+        json={
+            "user_id": user_id,
+            "recommendations": [
+                {
+                    "chrstn_mno": "LEARN-ST-001",
+                    "recommendation_score": "80.0",
+                    "price_score": "40",
+                    "waiting_time_score": "90",
+                    "distance_score": "85",
+                    "facilities_score": "25",
+                }
+            ],
+        },
+    )
 
     learn_res = client.post(
         f"/users/{user_id}/preferences/learn",
         json={
             "chrstn_mno": "LEARN-ST-001",
-            "sub_scores": {
-                "price": 40,
-                "waiting_time": 90,
-                "distance": 85,
-                "facilities": 25,
-            },
         },
     )
 

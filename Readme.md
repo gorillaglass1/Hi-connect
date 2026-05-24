@@ -37,7 +37,7 @@ HY-Connect는 이 조건들을 한 번에 계산해 차량 안에서 바로 선�
 2. 필요하면 "인천에 있고 가격이 낮고 대기 차량이 적은 충전소"처럼 자연어 조건을 넣습니다.
 3. 서버가 조건에 맞는 충전소 후보를 찾고, 개인 가중치로 점수를 계산합니다.
 4. 사용자는 추천 카드에서 `경로안내`를 누릅니다.
-5. 서버는 선택된 충전소의 세부 점수를 보고 사용자 선호 가중치를 조금 조정합니다.
+5. 프론트는 충전소 관리번호만 서버에 보내고, 서버가 추천 이력에 저장된 점수 스냅샷으로 선호 가중치를 조금 조정합니다.
 6. 차량으로 보낼 JSON은 중복을 줄인 간단한 형식으로 만들어집니다.
 
 ---
@@ -70,6 +70,8 @@ HY-Connect는 이 조건들을 한 번에 계산해 차량 안에서 바로 선�
 
 이 사용자는 가격보다 대기와 거리가 높은 충전소를 선택했으므로, 서버는 대기/거리 가중치를 조금 올리고 가격/편의시설 가중치를 조금 낮춥니다.
 
+프론트는 위 점수를 학습 요청에 담아 보내지 않습니다. 추천 생성 시 서버가 `recommendation_history`에 점수 스냅샷을 저장하고, 경로안내 선택 시에는 `chrstn_mno`만 받아 해당 이력을 찾아 학습합니다.
+
 학습 공식은 다음과 같습니다.
 
 ```text
@@ -98,8 +100,7 @@ new_weight = old_weight * 0.9 + observed_preference * 0.1
   "facilities": ["대기실", "세차장", "편의점", "화장실"],
   "is_reachable": true,
   "final_score": 84.1,
-  "recommendation_reason": "사용자 가중치 분석 결과 전반적 매칭도가 매우 높습니다.",
-  "hyundai_nav_deeplink": "hyundainav://route?..."
+  "recommendation_reason": "사용자 가중치 분석 결과 전반적 매칭도가 매우 높습니다."
 }
 ```
 
@@ -173,6 +174,12 @@ GOOGLE_API_KEY=
 
 Gemini 키가 없어도 기본 추천 기능은 동작합니다. 이 경우 자연어 Text-to-SQL 필터만 사용할 수 없습니다.
 
+### 기존 DB 마이그레이션
+
+기존 Supabase/PostgreSQL DB를 계속 사용한다면 추천 이력에 학습용 점수 스냅샷 컬럼을 한 번 추가해야 합니다.
+
+`sql/recommendation_history_score_snapshot_migration.sql` 파일 내용을 Supabase SQL Editor에 그대로 붙여 넣어 실행하면 됩니다.
+
 ### 서버 실행
 
 ```bash
@@ -209,6 +216,7 @@ pytest tests/core/test_status_sync.py
 브라우저
   |
   | POST /recommendations/personalized
+  | 또는 POST /recommendations/personalized/delivery-payloads
   v
 FastAPI Router
   |
@@ -231,7 +239,7 @@ POST /users/{user_id}/preferences/learn
   v
 UserPreferenceService
   |
-  |-- 선택 충전소의 sub_scores를 관측 선호도로 변환
+  |-- 최신 추천 이력에 저장된 세부 점수를 관측 선호도로 변환
   |-- 기존 가중치와 9:1로 혼합
   |-- user_preferences 업데이트
   |-- recommendation_history selected 처리
@@ -379,17 +387,11 @@ POST /users/{user_id}/preferences/learn
 
 ```json
 {
-  "chrstn_mno": "2820020121HS2019018",
-  "sub_scores": {
-    "price": 40,
-    "waiting_time": 90,
-    "distance": 85,
-    "facilities": 25
-  }
+  "chrstn_mno": "2820020121HS2019018"
 }
 ```
 
-응답은 업데이트된 사용자 가중치입니다.
+프론트는 학습용 세부 점수를 보내지 않습니다. 서버가 최신 추천 이력에 저장한 점수 스냅샷으로 학습합니다. 응답은 업데이트된 사용자 가중치입니다.
 
 ```json
 {
@@ -442,6 +444,17 @@ Content-Type: application/json
 
 응답은 추천 충전소 배열입니다. 각 항목에는 화면 표시용 필드, 세부 점수, 차량 전송용 `delivery_payload`, 딥링크가 포함됩니다.
 
+### 차량 전송용 추천 요청
+
+대시보드 오른쪽 차량 적용 영역과 실제 차량 전송 시에는 아래 API를 사용합니다.
+
+```http
+POST /recommendations/personalized/delivery-payloads
+Content-Type: application/json
+```
+
+요청 body는 `/recommendations/personalized`와 같습니다. 응답은 `delivery_payload` 배열만 반환하므로 `sub_scores`, 중첩 `delivery_payload`, 딥링크가 포함되지 않습니다.
+
 ### 선택 학습 요청
 
 프론트에서 경로안내 버튼을 누르면 아래 요청을 보냅니다.
@@ -453,17 +466,11 @@ Content-Type: application/json
 
 ```json
 {
-  "chrstn_mno": "2820020121HS2019018",
-  "sub_scores": {
-    "price": 40,
-    "waiting_time": 90,
-    "distance": 85,
-    "facilities": 25
-  }
+  "chrstn_mno": "2820020121HS2019018"
 }
 ```
 
-서버는 이 요청을 보고 사용자 가중치를 천천히 조정합니다.
+서버는 이 충전소의 최신 추천 이력을 찾아서, 그 이력에 저장된 가격/대기/거리/편의시설 점수로 사용자 가중치를 천천히 조정합니다.
 
 ---
 
@@ -498,6 +505,8 @@ Content-Type: application/json
 - 경로안내 버튼
 - 선택 학습 결과 모달
 - 차량 전송용 JSON 확인
+
+추천 결과 영역은 차량 전송용 API인 `POST /recommendations/personalized/delivery-payloads`를 호출합니다. 오른쪽 모달에 보이는 JSON은 실제 차량에 전달하는 flat payload와 같은 형식입니다.
 
 경로안내 버튼을 누르면 실제로 다음 API가 호출됩니다.
 

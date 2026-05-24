@@ -49,6 +49,10 @@ CREATE TABLE IF NOT EXISTS recommendation_history (
     chrstn_mno VARCHAR(30) NOT NULL REFERENCES hydrogen_stations(chrstn_mno) ON DELETE CASCADE,
     recommendation_score NUMERIC(5, 2),
     recommendation_reason VARCHAR(255),
+    price_score NUMERIC(5, 2),
+    waiting_time_score NUMERIC(5, 2),
+    distance_score NUMERIC(5, 2),
+    facilities_score NUMERIC(5, 2),
     user_latitude NUMERIC(10, 7),
     user_longitude NUMERIC(10, 7),
     vehicle_remaining_hydrogen NUMERIC(6, 2),
@@ -61,6 +65,10 @@ CREATE TABLE IF NOT EXISTS recommendation_history (
 
 ALTER TABLE charging_log DROP COLUMN IF EXISTS vehicle_id;
 ALTER TABLE recommendation_history DROP COLUMN IF EXISTS vehicle_id;
+ALTER TABLE recommendation_history ADD COLUMN IF NOT EXISTS price_score NUMERIC(5, 2);
+ALTER TABLE recommendation_history ADD COLUMN IF NOT EXISTS waiting_time_score NUMERIC(5, 2);
+ALTER TABLE recommendation_history ADD COLUMN IF NOT EXISTS distance_score NUMERIC(5, 2);
+ALTER TABLE recommendation_history ADD COLUMN IF NOT EXISTS facilities_score NUMERIC(5, 2);
 
 INSERT INTO users (
     user_id,
@@ -160,16 +168,20 @@ seed_recommendations AS (
     SELECT *
     FROM (
         VALUES
-            (1, 1, 96.50::NUMERIC(5, 2), '대기 차량이 가장 적은 충전소입니다.', 37.3920000::NUMERIC(10, 7), 126.6510000::NUMERIC(10, 7), 32.50::NUMERIC(6, 2), 8, true, TIMESTAMP '2026-05-22 08:00:00', 'LOW_WAIT'),
-            (1, 2, 88.00::NUMERIC(5, 2), '영업중이며 접근성이 좋습니다.', 37.4605000::NUMERIC(10, 7), 126.4510000::NUMERIC(10, 7), 32.50::NUMERIC(6, 2), 18, false, NULL::TIMESTAMP, 'NEARBY'),
-            (2, 3, 72.00::NUMERIC(5, 2), '영업중이나 대기 차량이 많습니다.', 37.4050000::NUMERIC(10, 7), 126.7210000::NUMERIC(10, 7), 18.20::NUMERIC(6, 2), 12, false, NULL::TIMESTAMP, 'LOW_DISTANCE'),
-            (3, 4, 84.20::NUMERIC(5, 2), '비교 추천 데이터입니다.', 37.5705000::NUMERIC(10, 7), 126.8810000::NUMERIC(10, 7), 41.00::NUMERIC(6, 2), 15, true, TIMESTAMP '2026-05-20 13:50:00', 'NEARBY'),
-            (4, 5, 45.00::NUMERIC(5, 2), '운영상태에 따른 낮은 우선순위 추천입니다.', 37.3910000::NUMERIC(10, 7), 127.1120000::NUMERIC(10, 7), 12.00::NUMERIC(6, 2), 20, false, NULL::TIMESTAMP, 'STATUS_PENALTY')
+            (1, 1, 96.50::NUMERIC(5, 2), '대기 차량이 가장 적은 충전소입니다.', 45.00::NUMERIC(5, 2), 100.00::NUMERIC(5, 2), 92.00::NUMERIC(5, 2), 75.00::NUMERIC(5, 2), 37.3920000::NUMERIC(10, 7), 126.6510000::NUMERIC(10, 7), 32.50::NUMERIC(6, 2), 8, true, TIMESTAMP '2026-05-22 08:00:00', 'LOW_WAIT'),
+            (1, 2, 88.00::NUMERIC(5, 2), '영업중이며 접근성이 좋습니다.', 60.00::NUMERIC(5, 2), 80.00::NUMERIC(5, 2), 95.00::NUMERIC(5, 2), 50.00::NUMERIC(5, 2), 37.4605000::NUMERIC(10, 7), 126.4510000::NUMERIC(10, 7), 32.50::NUMERIC(6, 2), 18, false, NULL::TIMESTAMP, 'NEARBY'),
+            (2, 3, 72.00::NUMERIC(5, 2), '영업중이나 대기 차량이 많습니다.', 70.00::NUMERIC(5, 2), 35.00::NUMERIC(5, 2), 85.00::NUMERIC(5, 2), 25.00::NUMERIC(5, 2), 37.4050000::NUMERIC(10, 7), 126.7210000::NUMERIC(10, 7), 18.20::NUMERIC(6, 2), 12, false, NULL::TIMESTAMP, 'LOW_DISTANCE'),
+            (3, 4, 84.20::NUMERIC(5, 2), '비교 추천 데이터입니다.', 55.00::NUMERIC(5, 2), 90.00::NUMERIC(5, 2), 82.00::NUMERIC(5, 2), 75.00::NUMERIC(5, 2), 37.5705000::NUMERIC(10, 7), 126.8810000::NUMERIC(10, 7), 41.00::NUMERIC(6, 2), 15, true, TIMESTAMP '2026-05-20 13:50:00', 'NEARBY'),
+            (4, 5, 45.00::NUMERIC(5, 2), '운영상태에 따른 낮은 우선순위 추천입니다.', 30.00::NUMERIC(5, 2), 20.00::NUMERIC(5, 2), 40.00::NUMERIC(5, 2), 25.00::NUMERIC(5, 2), 37.3910000::NUMERIC(10, 7), 127.1120000::NUMERIC(10, 7), 12.00::NUMERIC(6, 2), 20, false, NULL::TIMESTAMP, 'STATUS_PENALTY')
     ) AS rows(
         user_id,
         station_rank,
         recommendation_score,
         recommendation_reason,
+        price_score,
+        waiting_time_score,
+        distance_score,
+        facilities_score,
         user_latitude,
         user_longitude,
         vehicle_remaining_hydrogen,
@@ -184,6 +196,10 @@ INSERT INTO recommendation_history (
     chrstn_mno,
     recommendation_score,
     recommendation_reason,
+    price_score,
+    waiting_time_score,
+    distance_score,
+    facilities_score,
     user_latitude,
     user_longitude,
     vehicle_remaining_hydrogen,
@@ -196,6 +212,10 @@ SELECT seed_recommendations.user_id,
        station_refs.chrstn_mno,
        seed_recommendations.recommendation_score,
        seed_recommendations.recommendation_reason,
+       seed_recommendations.price_score,
+       seed_recommendations.waiting_time_score,
+       seed_recommendations.distance_score,
+       seed_recommendations.facilities_score,
        seed_recommendations.user_latitude,
        seed_recommendations.user_longitude,
        seed_recommendations.vehicle_remaining_hydrogen,

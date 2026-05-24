@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.schemas.recommendation_schema import (
+    RecommendationDeliveryPayload,
     RecommendationSearchRequest,
     RecommendedStationResponse,
 )
@@ -22,3 +23,20 @@ async def search_personalized_recommendations(
     """
     service = RecommendationService(db)
     return await service.get_personalized_recommendations(request)
+
+
+@router.post(
+    "/personalized/delivery-payloads",
+    response_model=list[RecommendationDeliveryPayload],
+)
+async def search_personalized_recommendation_delivery_payloads(
+    request: RecommendationSearchRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    차량 적용 화면에서 사용할 수 있도록 추천 결과 중 차량 전송용 payload만 리턴합니다.
+    추천 이력은 서버에 저장되므로, 이후 경로안내 선택 학습은 chrstn_mno만 보내면 됩니다.
+    """
+    service = RecommendationService(db)
+    recommendations = await service.get_personalized_recommendations(request)
+    return [recommendation.delivery_payload for recommendation in recommendations]

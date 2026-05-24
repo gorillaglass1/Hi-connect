@@ -1,13 +1,12 @@
 import math
 import logging
 from decimal import Decimal
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import HTTPException
 
-from app.models.hydrogen_station import HydrogenStation
-from app.repositories import user_preference_repo, recommendation_history_repo
+from app.repositories import (
+    hydrogen_station_repo,
+    recommendation_history_repo,
+)
 from app.schemas.recommendation_schema import (
     RecommendationSearchRequest,
     RecommendedStationResponse,
@@ -23,6 +22,7 @@ from app.services.recommendation_candidate_filter_service import (
 from app.services.recommendation_delivery_payload_service import (
     RecommendationDeliveryPayloadService,
 )
+from app.services.user_preference_service import UserPreferenceService
 
 logger = logging.getLogger("recommendation_service")
 
@@ -53,13 +53,7 @@ class RecommendationService:
         request: RecommendationSearchRequest,
     ) -> list[RecommendedStationResponse]:
         # 1. Fetch user preference weights
-        pref = await user_preference_repo.get_user_preferences(self.db, request.user_id)
-        if pref is None:
-            # If user does not exist, raise exception
-            raise HTTPException(
-                status_code=404,
-                detail=f"User with ID {request.user_id} not found in database.",
-            )
+        pref = await UserPreferenceService(self.db).get_user_preferences(request.user_id)
 
         w_price = float(pref.weight_price)
         w_wait = float(pref.weight_waiting_time)
@@ -75,22 +69,10 @@ class RecommendationService:
             return []
 
         # 3. Query all stations from DB with status and facilities relationships
-        stmt = (
-            select(HydrogenStation)
-            .where(HydrogenStation.oper_yn == "Y")
-            .where(HydrogenStation.del_at == "0")
-            .options(
-                selectinload(HydrogenStation.status_list),
-                selectinload(HydrogenStation.facilities_list),
-            )
+        stations = await hydrogen_station_repo.get_active_hydrogen_stations_for_recommendation(
+            self.db,
+            filtered_mno_list,
         )
-        
-        # Apply Text-to-SQL filter if it succeeded
-        if filtered_mno_list is not None:
-            stmt = stmt.where(HydrogenStation.chrstn_mno.in_(filtered_mno_list))
-
-        result = await self.db.execute(stmt)
-        stations = result.scalars().all()
 
         if not stations:
             return []
@@ -252,7 +234,6 @@ class RecommendationService:
                 is_reachable=is_reachable,
                 final_score=rounded_final_score,
                 recommendation_reason=reason_str,
-                hyundai_nav_deeplink=deeplink,
             )
 
             scored_candidates.append(
@@ -293,6 +274,10 @@ class RecommendationService:
                         chrstn_mno=r.chrstn_mno,
                         recommendation_score=Decimal(str(r.final_score)),
                         recommendation_reason=r.recommendation_reason[:250],
+                        price_score=Decimal(str(r.sub_scores.price)),
+                        waiting_time_score=Decimal(str(r.sub_scores.waiting_time)),
+                        distance_score=Decimal(str(r.sub_scores.distance)),
+                        facilities_score=Decimal(str(r.sub_scores.facilities)),
                         estimated_arrival_time=int(r.distance_to_station * 1.5),  # rough estimate: 1.5 mins per km
                         selected=False,
                         selected_at=None,

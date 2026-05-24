@@ -18,6 +18,7 @@ from app.api.recommendation_api import router as recommendation_router
 from app.api.user_preference_api import router as user_preference_router
 from app.core.database import Base, engine
 from app.core.hying_startup_sync import sync_hying_hydrogen_data_on_startup
+from app.core.schema_migrations import apply_runtime_schema_migrations
 from app.core.status_sync import (
     start_hydrogen_station_status_sync_task,
     stop_hydrogen_station_status_sync_task,
@@ -40,6 +41,7 @@ logging.basicConfig(
 async def lifespan(_: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await apply_runtime_schema_migrations(conn)
     await sync_hying_hydrogen_data_on_startup()
     status_sync_task = start_hydrogen_station_status_sync_task()
     try:
