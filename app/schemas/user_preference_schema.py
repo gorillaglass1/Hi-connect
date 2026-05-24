@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class UserPreferenceBase(BaseModel):
@@ -18,7 +18,11 @@ class UserPreferenceUpdate(UserPreferenceBase):
 class UserPreferenceLearningRequest(BaseModel):
     chrstn_mno: str = Field(..., min_length=1, description="사용자가 선택한 충전소 관리번호")
     price_score: Decimal | None = Field(default=None, description="선택 당시 가격 점수")
-    waiting_score: Decimal | None = Field(default=None, description="선택 당시 대기시간 점수")
+    waiting_score: Decimal | None = Field(
+        default=None,
+        validation_alias=AliasChoices("waiting_score", "waiting_time_score"),
+        description="선택 당시 대기시간 점수",
+    )
     distance_score: Decimal | None = Field(default=None, description="선택 당시 거리 점수")
     facilities_score: Decimal | None = Field(default=None, description="선택 당시 편의시설 점수")
 

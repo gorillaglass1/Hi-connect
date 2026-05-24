@@ -75,8 +75,8 @@ class UserPreferenceService:
                 detail="Selected recommendation history was not found",
             )
 
-        score_history = selected_history
-        if not _history_has_score_snapshot(score_history):
+        score_values = _history_to_score_values(selected_history)
+        if score_values is None:
             score_history = await recommendation_history_repo.get_latest_recommendation_history_with_score_snapshot(
                 self.db,
                 user_id=user_id,
@@ -88,8 +88,8 @@ class UserPreferenceService:
                 score_values = _history_to_score_values(score_history)
             if score_values is None:
                 raise HTTPException(
-                    status_code=422,
-                    detail="Selected recommendation history deos not have score snapshot "
+                    status_code=409,
+                    detail="Selected recommendation history does not have score snapshot",
                 )
 
 
@@ -201,7 +201,10 @@ def _history_has_score_snapshot(history) -> bool:
     )
 
 
-def _history_to_score_values(history) -> dict[str, Decimal]:
+def _history_to_score_values(history) -> dict[str, Decimal] | None:
+    if not _history_has_score_snapshot(history):
+        return None
+
     return {
         "weight_price": Decimal(str(history.price_score)),
         "weight_waiting_time": Decimal(str(history.waiting_time_score)),

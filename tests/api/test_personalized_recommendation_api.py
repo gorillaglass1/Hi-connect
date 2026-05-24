@@ -99,6 +99,7 @@ def test_personalized_recommendation_returns_delivery_payload(client, monkeypatc
     assert top["delivery_payload"]["wait_vehicles"] == top["wait_vehicles"]
     assert top["delivery_payload"]["facilities"] == top["facilities"]
     assert top["delivery_payload"]["final_score"] == top["final_score"]
+    assert "hyundai_nav_deeplink" not in top
     assert "hyundai_nav_deeplink" not in top["delivery_payload"]
 
     vehicle_res = client.post(

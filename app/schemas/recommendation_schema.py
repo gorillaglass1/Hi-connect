@@ -56,4 +56,3 @@ class RecommendedStationResponse(BaseModel):
         ...,
         description="외부 시스템에 전달 가능한 표준 추천 JSON payload",
     )
-    hyundai_nav_deeplink: str = Field(..., description="데모용 내비 경유지 딥링크")

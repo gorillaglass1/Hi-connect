@@ -199,13 +199,6 @@ class RecommendationService:
 
             reason_str = " ".join(reasons)
 
-            # Generate simulated Hyundai navigation deeplink
-            deeplink = (
-                f"hyundainav://route?dest_lat={dest_lat}&dest_lon={dest_lon}"
-                f"&waypoint1_lat={cand['lat']}&waypoint1_lon={cand['lon']}"
-                f"&waypoint1_name={st.chrstn_nm}&user_id={request.user_id}"
-            )
-
             rounded_scores = SubScores(
                 price=round(price_score, 1),
                 waiting_time=round(wait_score, 1),
@@ -253,7 +246,6 @@ class RecommendationService:
                     final_score=rounded_final_score,
                     recommendation_reason=reason_str,
                     delivery_payload=delivery_payload,
-                    hyundai_nav_deeplink=deeplink,
                 )
             )
 

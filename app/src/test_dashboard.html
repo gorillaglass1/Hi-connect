@@ -640,87 +640,6 @@
             justify-self: end;
         }
 
-        /* Simulated Modal View */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.85);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .modal-content {
-            background: var(--bg-panel);
-            backdrop-filter: blur(25px);
-            border: 1px solid var(--border-glass);
-            border-radius: 24px;
-            max-width: 650px;
-            width: 100%;
-            padding: 35px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-            position: relative;
-        }
-
-        .modal-close {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            font-size: 1.4rem;
-            cursor: pointer;
-            color: var(--text-muted);
-            transition: color 0.3s;
-        }
-
-        .modal-close:hover {
-            color: white;
-        }
-
-        .modal-header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .modal-header i {
-            font-size: 2rem;
-            color: var(--accent-emerald);
-            filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.4));
-        }
-
-        .modal-title {
-            font-size: 1.4rem;
-            font-weight: 800;
-        }
-
-        .modal-body {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .json-block {
-            background: #020607;
-            border: 1px solid rgba(192,255,236,0.09);
-            border-radius: 12px;
-            padding: 15px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            overflow-x: auto;
-            max-height: 250px;
-        }
-
-        .json-block span.key { color: var(--accent-cyan); }
-        .json-block span.str { color: var(--accent-emerald); }
-        .json-block span.num { color: var(--accent-amber); }
-
         @media (max-width: 1320px) {
             .dashboard-container {
                 grid-template-columns: minmax(280px, 0.9fr) minmax(520px, 1.4fr);
@@ -975,28 +894,6 @@
         </div>
     </div>
 
-    <!-- Simulated Success Modal -->
-    <div class="modal" id="successModal">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closeModal()">&times;</span>
-            <div class="modal-header">
-                <i class="fa-solid fa-circle-check"></i>
-                <h3 class="modal-title">경로 안내 및 선호도 학습 완료</h3>
-            </div>
-            <div class="modal-body">
-                <p style="font-size: 0.95rem; line-height: 1.5;">
-                    선택한 충전소가 차량 내비게이션 경유지 payload로 정리되었고,
-                    사용자의 가격, 대기, 거리, 편의시설 선호도 가중치가 선택 결과를 기준으로 조금 조정되었습니다.
-                </p>
-                
-                <h4 style="font-size: 0.9rem; font-weight: 700; margin-top: 10px; color: var(--accent-cyan);">차량 전송용 추천 JSON</h4>
-                <div class="json-block" id="jsonBlock">
-                    <!-- Dynamic JSON will go here -->
-                </div>
-
-            </div>
-        </div>
-    </div>
     <script>
         // Global variables for coordinates and dummy data
         let stationsList = [];
@@ -1462,11 +1359,7 @@
             logTerminal(`Route guidance selected for ${selectedPayload.chrstn_nm}. Updating preference weights...`);
 
             const learningPayload = {
-                chrstn_mno: selectedPayload.chrstn_mno,
-                price_score: selectedPayload.sub_scores?.price ?? null,
-                waiting_time_score: selectedPayload.sub_scores?.waiting_time ?? null,
-                distance_score: selectedPayload.sub_scores?.distance ?? null,
-                facilities_score: selectedPayload.sub_scores?.facilities ?? null
+                chrstn_mno: selectedPayload.chrstn_mno
             };
 
             try {
@@ -1483,33 +1376,14 @@
                     setSlider("weightDistance", "weightDistanceVal", updatedPreference.weight_distance);
                     setSlider("weightFacilities", "weightFacilitiesVal", updatedPreference.weight_facilities);
                     setSlider("safetyMargin", "safetyMarginVal", updatedPreference.safety_margin);
-                    logTerminal(`Preference weights updated from server-side recommendation history.`, "success");
-                    showModal(selectedPayload);
+                    logTerminal(`Preference weights updated from selected station.`, "success");
+                    alert("선택 학습이 완료되었습니다.");
                 } else {
                     logTerminal(`Preference learning failed. status: ${res.status}`, "warning");
-                    alert("선택 학습 처리에 실패했습니다.");
                 }
             } catch (err) {
                 logTerminal(`Connection error during preference learning.`, "warning");
             }
-        }
-
-        function showModal(vehiclePayload) {
-            const modal = document.getElementById("successModal");
-            
-            // Format JSON nicely
-            const jsonStr = JSON.stringify(vehiclePayload, null, 2);
-            const formatted = jsonStr
-                .replace(/"([^"]+)":/g, '<span class="key">"$1"</span>:')
-                .replace(/: "([^"]+)"/g, ': <span class="str">"$1"</span>')
-                .replace(/: ([0-9.-]+)/g, ': <span class="num">$1</span>');
-                
-            document.getElementById("jsonBlock").innerHTML = formatted;
-            modal.style.display = "flex";
-        }
-
-        function closeModal() {
-            document.getElementById("successModal").style.display = "none";
         }
 
     </script>
