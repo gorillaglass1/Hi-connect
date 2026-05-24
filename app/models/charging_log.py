@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.orm import relationship
 
@@ -19,6 +21,6 @@ class ChargingLog(Base):
     charged_amount = Column(Numeric(6, 2))
     charging_cost = Column(Numeric(10, 2))
     waiting_time = Column(Integer)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now().astimezone(None))
 
     station = relationship("HydrogenStation")

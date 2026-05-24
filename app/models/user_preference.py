@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, func
 from sqlalchemy.orm import relationship
 
@@ -18,11 +20,11 @@ class UserPreference(Base):
     weight_distance = Column(Numeric(4, 2), default=1.0, comment="우회거리 가중치")
     weight_facilities = Column(Numeric(4, 2), default=1.0, comment="편의시설 가중치")
     safety_margin = Column(Numeric(4, 2), default=1.1, comment="주행가능거리 최소 안전 계수")
-    created_at = Column(DateTime, server_default=func.now(), comment="생성 일시")
+    created_at = Column(DateTime, default=lambda: datetime.now().astimezone(None), comment="생성 일시")
     updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
+        DateTime(timezone=True),
+        default=lambda: datetime.now().astimezone(None),
+        onupdate=lambda: datetime.now().astimezone(None),
         comment="수정 일시",
     )
 

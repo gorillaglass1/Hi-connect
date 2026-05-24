@@ -1,3 +1,6 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.orm import relationship
 
@@ -27,6 +30,6 @@ class RecommendationHistory(Base):
     selected = Column(Boolean, default=False)
     selected_at = Column(DateTime)
     recommendation_type = Column(String(50))
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now().astimezone(None))
 
     station = relationship("HydrogenStation")

@@ -78,8 +78,8 @@ class HydrogenStation(Base):
     oper_yn = Column(CHAR(1), comment="운영 여부 Y/N")
     del_at = Column(CHAR(1), default="0", comment="삭제 여부")
 
-    last_mdfcn_dt = Column(DateTime, nullable=True, comment="최종 수정 일시")
-    timestamp = Column(DateTime, nullable=True, comment="데이터 수집 또는 갱신 일시")
+    last_mdfcn_dt = Column(DateTime(timezone=True), nullable=True, comment="최종 수정 일시")
+    timestamp = Column(DateTime(timezone=True), nullable=True, comment="데이터 수집 또는 갱신 일시")
 
     rltm_info_yn = Column(CHAR(1), comment="실시간 정보 제공 여부 Y/N")
 

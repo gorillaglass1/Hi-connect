@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, CHAR, func
 from sqlalchemy.orm import relationship
 
@@ -26,14 +28,14 @@ class HydrogenStationAdditionalInfo(Base):
 
     del_at = Column(CHAR(1), default="0", comment="삭제 여부")
 
-    last_mdfcn_dt = Column(DateTime, nullable=True, comment="최종 수정 일시")
-    timestamp = Column(DateTime, nullable=True, comment="데이터 수집 또는 갱신 일시")
+    last_mdfcn_dt = Column(DateTime(timezone=True), nullable=True, comment="최종 수정 일시")
+    timestamp = Column(DateTime(timezone=True), nullable=True, comment="데이터 수집 또는 갱신 일시")
 
-    created_at = Column(DateTime, server_default=func.now(), comment="DB 생성 일시")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now().astimezone(None), comment="DB 생성 일시")
     updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
+        DateTime(timezone=True),
+        default=lambda: datetime.now().astimezone(None),
+        onupdate=lambda: datetime.now().astimezone(None),
         comment="DB 수정 일시",
     )
 

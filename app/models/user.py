@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import Column, DateTime, Integer, String, func
 from sqlalchemy.orm import relationship
 
@@ -11,7 +13,7 @@ class User(Base):
     name = Column(String(50), nullable=False, comment="사용자 이름")
     phone = Column(String(20), comment="사용자 전화번호")
     email = Column(String(255), unique=True, comment="사용자 이메일")
-    created_at = Column(DateTime, server_default=func.now(), comment="가입 일시")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now().astimezone(None), comment="가입 일시")
 
     # 관계 설정
     preferences = relationship(
