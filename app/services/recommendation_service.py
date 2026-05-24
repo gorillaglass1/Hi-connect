@@ -1,6 +1,7 @@
 import math
 import logging
 from decimal import Decimal
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import (
@@ -22,11 +23,15 @@ from app.services.recommendation_candidate_filter_service import (
 from app.services.recommendation_delivery_payload_service import (
     RecommendationDeliveryPayloadService,
 )
+from app.services.path_range_specification import find_charging_stations
 from app.services.user_preference_service import UserPreferenceService
 
 logger = logging.getLogger("recommendation_service")
 
 RECOMMENDATION_RESPONSE_LIMIT = 5
+AUTO_ALPHA_RATIO = 0.60
+PATH_RANGE_ESTIMATED_ROUTE_RATIO = 1.60
+PATH_RANGE_PADDING_KM = 5.0
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -61,12 +66,55 @@ class RecommendationService:
         w_facilities = float(pref.weight_facilities)
         safety_margin = float(pref.safety_margin)
 
+        cur_lat = float(request.current_latitude)
+        cur_lon = float(request.current_longitude)
+        dest_lat = float(request.destination_latitude)
+        dest_lon = float(request.destination_longitude)
+        direct_dist = haversine_distance(cur_lat, cur_lon, dest_lat, dest_lon)
+
         # 2. Step 1: Optional Text-to-SQL candidate filter.
         filtered_mno_list = await self.candidate_filter_service.filter_by_natural_language(
             request.nl_query
         )
         if filtered_mno_list == []:
             return []
+
+        use_path_range_filter = False
+        try:
+            estimated_route_distance = direct_dist * PATH_RANGE_ESTIMATED_ROUTE_RATIO
+            path_range_result = await find_charging_stations(
+                self.db,
+                x_lat=cur_lat,
+                x_lng=cur_lon,
+                y_lat=dest_lat,
+                y_lng=dest_lon,
+                actual_distance_km=estimated_route_distance,
+                padding_km=PATH_RANGE_PADDING_KM,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        path_range_mno_list = [
+            station.chrstn_mno
+            for station in path_range_result["candidate_stations"]
+        ]
+        if path_range_mno_list:
+            if filtered_mno_list is None:
+                filtered_mno_list = path_range_mno_list
+                use_path_range_filter = True
+            else:
+                path_range_ids = set(path_range_mno_list)
+                filtered_mno_list = [
+                    chrstn_mno
+                    for chrstn_mno in filtered_mno_list
+                    if chrstn_mno in path_range_ids
+                ]
+                use_path_range_filter = True
+                if not filtered_mno_list:
+                    return []
+
+        auto_alpha = 0.0 if use_path_range_filter else direct_dist * AUTO_ALPHA_RATIO
+        search_radius = direct_dist + auto_alpha
 
         # 3. Query all stations from DB with status and facilities relationships
         stations = await hydrogen_station_repo.get_active_hydrogen_stations_for_recommendation(
@@ -76,15 +124,6 @@ class RecommendationService:
 
         if not stations:
             return []
-
-        # 4. Calculate direct distance from current location to destination
-        cur_lat = float(request.current_latitude)
-        cur_lon = float(request.current_longitude)
-        dest_lat = float(request.destination_latitude)
-        dest_lon = float(request.destination_longitude)
-        
-        direct_dist = haversine_distance(cur_lat, cur_lon, dest_lat, dest_lon)
-        search_radius = direct_dist + float(request.alpha)
 
         # 5. Pre-calculate spatial bounds & collect price stats
         candidate_stations = []
@@ -97,8 +136,9 @@ class RecommendationService:
             # Distance from current location to this station
             dist_to_station = haversine_distance(cur_lat, cur_lon, st_lat, st_lon)
             
-            # Bounding circle filtering
-            if dist_to_station > search_radius:
+            # Bounding circle filtering. Path-range requests already narrowed
+            # candidates using the actual route distance envelope.
+            if not use_path_range_filter and dist_to_station > search_radius:
                 continue
 
             # Distance from station to destination

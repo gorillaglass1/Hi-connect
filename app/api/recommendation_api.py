@@ -1,11 +1,16 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
+from app.schemas.path_range_schema import (
+    PathRangeStationSearchRequest,
+    PathRangeStationSearchResponse,
+)
 from app.schemas.recommendation_schema import (
     RecommendationDeliveryPayload,
     RecommendationSearchRequest,
     RecommendedStationResponse,
 )
+from app.services.path_range_specification import find_charging_stations
 from app.services.recommendation_service import RecommendationService
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
@@ -40,3 +45,29 @@ async def search_personalized_recommendation_delivery_payloads(
     service = RecommendationService(db)
     recommendations = await service.get_personalized_recommendations(request)
     return [recommendation.delivery_payload for recommendation in recommendations]
+
+
+@router.post(
+    "/path-range/stations",
+    response_model=PathRangeStationSearchResponse,
+)
+async def search_path_range_stations(
+    request: PathRangeStationSearchRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    출발지와 목적지 사이의 실제 경로 거리로 만들어지는 경유 가능 범위에서
+    충전소 후보를 조회합니다.
+    """
+    try:
+        return await find_charging_stations(
+            db,
+            x_lat=float(request.start_latitude),
+            x_lng=float(request.start_longitude),
+            y_lat=float(request.destination_latitude),
+            y_lng=float(request.destination_longitude),
+            actual_distance_km=float(request.actual_distance_km),
+            padding_km=float(request.padding_km),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

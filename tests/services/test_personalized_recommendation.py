@@ -134,7 +134,6 @@ async def test_personalized_recommendation_and_preferences(db_session, monkeypat
         destination_latitude=Decimal("37.4600"),
         destination_longitude=Decimal("126.4500"),
         remaining_range=Decimal("45.0"),
-        alpha=Decimal("15.0"),
         nl_query="테스트 충전소만",
     )
     
@@ -257,6 +256,155 @@ def test_haversine_distance_matches_known_short_route_distance():
 
 
 @pytest.mark.asyncio
+async def test_personalized_recommendation_scores_low_detour_route_higher(
+    db_session,
+    monkeypatch,
+):
+    async def use_detour_scenario_stations(self, _nl_query):
+        return ["DETOUR-LOW-001", "DETOUR-HIGH-001"]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_detour_scenario_stations,
+    )
+    user = await UserPreferenceService(db_session).create_user(
+        UserCreate(
+            name="우회거리 시나리오 사용자",
+            phone="010-7777-0101",
+            email="detour-scenario-user@example.com",
+        )
+    )
+    await UserPreferenceService(db_session).update_user_preferences(
+        user.user_id,
+        UserPreferenceUpdate(
+            weight_price=Decimal("0.0"),
+            weight_waiting_time=Decimal("0.0"),
+            weight_distance=Decimal("3.0"),
+            weight_facilities=Decimal("0.0"),
+            safety_margin=Decimal("1.0"),
+        ),
+    )
+
+    station_service = HydrogenStationService(db_session)
+    await station_service.create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="DETOUR-LOW-001",
+            chrstn_nm="목적지 방향 저우회 충전소",
+            ntsl_pc=10000,
+            let=Decimal("37.0000"),
+            lon=Decimal("127.1000"),
+            oper_yn="Y",
+        )
+    )
+    await station_service.create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="DETOUR-HIGH-001",
+            chrstn_nm="가까워 보이는 고우회 충전소",
+            ntsl_pc=10000,
+            let=Decimal("37.0900"),
+            lon=Decimal("127.0000"),
+            oper_yn="Y",
+        )
+    )
+
+    recommendations = await RecommendationService(
+        db_session
+    ).get_personalized_recommendations(
+        RecommendationSearchRequest(
+            user_id=user.user_id,
+            current_latitude=Decimal("37.0000"),
+            current_longitude=Decimal("127.0000"),
+            destination_latitude=Decimal("37.0000"),
+            destination_longitude=Decimal("127.2000"),
+            remaining_range=Decimal("100.0"),
+            nl_query="우회거리 테스트 충전소만",
+        )
+    )
+
+    assert [rec.chrstn_mno for rec in recommendations] == [
+        "DETOUR-LOW-001",
+        "DETOUR-HIGH-001",
+    ]
+    low_detour, high_detour = recommendations
+    assert low_detour.detour_distance == pytest.approx(0.0, abs=0.1)
+    assert high_detour.detour_distance > 10.0
+    assert low_detour.sub_scores.distance > 95.0
+    assert high_detour.sub_scores.distance < 30.0
+    assert low_detour.final_score > high_detour.final_score
+    assert low_detour.delivery_payload.detour_distance == low_detour.detour_distance
+
+
+@pytest.mark.asyncio
+async def test_personalized_recommendation_uses_path_range_candidates(
+    db_session,
+    monkeypatch,
+):
+    async def use_only_path_range_test_stations(self, _nl_query):
+        return [
+            "REC-PATH-RANGE-IN",
+            "REC-PATH-RANGE-INNER",
+            "REC-PATH-RANGE-OUT",
+        ]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_only_path_range_test_stations,
+    )
+    user = await UserPreferenceService(db_session).create_user(
+        UserCreate(
+            name="실경로 후보 추천 사용자",
+            phone="010-7777-0102",
+            email="path-range-recommendation-user@example.com",
+        )
+    )
+    station_service = HydrogenStationService(db_session)
+    for station in [
+        HydrogenStationCreate(
+            chrstn_mno="REC-PATH-RANGE-IN",
+            chrstn_nm="추천 경로 범위 포함 충전소",
+            let=Decimal("36.0200"),
+            lon=Decimal("128.1000"),
+            oper_yn="Y",
+        ),
+        HydrogenStationCreate(
+            chrstn_mno="REC-PATH-RANGE-INNER",
+            chrstn_nm="추천 경로 내부 제외 충전소",
+            let=Decimal("36.1000"),
+            lon=Decimal("128.1000"),
+            oper_yn="Y",
+        ),
+        HydrogenStationCreate(
+            chrstn_mno="REC-PATH-RANGE-OUT",
+            chrstn_nm="추천 경로 범위 외부 충전소",
+            let=Decimal("36.5000"),
+            lon=Decimal("128.5000"),
+            oper_yn="Y",
+        ),
+    ]:
+        await station_service.create_hydrogen_station(station)
+
+    recommendations = await RecommendationService(
+        db_session
+    ).get_personalized_recommendations(
+        RecommendationSearchRequest(
+            user_id=user.user_id,
+            current_latitude=Decimal("36.0"),
+            current_longitude=Decimal("128.0"),
+            destination_latitude=Decimal("36.2"),
+            destination_longitude=Decimal("128.2"),
+            remaining_range=Decimal("100.0"),
+        )
+    )
+
+    assert {rec.chrstn_mno for rec in recommendations} == {
+        "REC-PATH-RANGE-IN",
+        "REC-PATH-RANGE-INNER",
+    }
+
+
+@pytest.mark.asyncio
 async def test_personalized_recommendation_returns_empty_when_no_active_stations(
     db_session,
     monkeypatch,
@@ -287,7 +435,6 @@ async def test_personalized_recommendation_returns_empty_when_no_active_stations
             destination_latitude=Decimal("37.4600"),
             destination_longitude=Decimal("126.4500"),
             remaining_range=Decimal("45.0"),
-            alpha=Decimal("15.0"),
             nl_query="없는 충전소만",
         )
     )
@@ -336,7 +483,6 @@ async def test_personalized_recommendation_penalizes_unreachable_station(
             destination_latitude=Decimal("37.4600"),
             destination_longitude=Decimal("126.4500"),
             remaining_range=Decimal("1.0"),
-            alpha=Decimal("15.0"),
         )
     )
 

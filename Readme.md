@@ -104,6 +104,14 @@ new_weight = old_weight * 0.9 + observed_preference * 0.1
 }
 ```
 
+### 실제 경로 범위 기반 충전소 후보 검색
+
+출발지와 목적지의 직선거리만 보지 않고, 실제 경로 거리로 만들어지는 우회 가능 범위를 계산해 충전소 후보를 찾을 수 있습니다.
+
+- 외접 박스 안에 있는 충전소를 1차 조회합니다.
+- 내접 박스는 제외해 경로 주변 링 형태의 후보만 남깁니다.
+- `POST /recommendations/path-range/stations`로 바로 호출할 수 있습니다.
+
 ### 상태 테이블 자동 최신화
 
 서버가 실행되면 Hying API에서 충전소 기본 정보, 부대시설, 상태 정보를 한 번 동기화합니다.  
@@ -437,10 +445,11 @@ Content-Type: application/json
   "destination_latitude": 37.46,
   "destination_longitude": 126.45,
   "remaining_range": 45,
-  "alpha": 15,
   "nl_query": "인천에 있고 대기 차량이 적은 충전소"
 }
 ```
+
+추천 API 요청자는 alpha나 실제 경로거리를 보내지 않습니다. 서버가 내부 기준으로 `path_range_specification` 후보 검색을 먼저 시도하고, 적용 가능한 후보가 있으면 해당 후보만 점수화합니다. 후보가 없으면 서버가 직선거리의 일정 비율로 검색 반경 버퍼를 자동 계산해 기존 반경 방식으로 fallback합니다.
 
 응답은 추천 충전소 배열입니다. 각 항목에는 화면 표시용 필드, 세부 점수, 차량 전송용 `delivery_payload`, 딥링크가 포함됩니다.
 
@@ -454,6 +463,26 @@ Content-Type: application/json
 ```
 
 요청 body는 `/recommendations/personalized`와 같습니다. 응답은 `delivery_payload` 배열만 반환하므로 `sub_scores`, 중첩 `delivery_payload`, 딥링크가 포함되지 않습니다.
+
+### 경로 범위 충전소 후보 검색
+
+```http
+POST /recommendations/path-range/stations
+Content-Type: application/json
+```
+
+```json
+{
+  "start_latitude": 37.0,
+  "start_longitude": 126.0,
+  "destination_latitude": 37.2,
+  "destination_longitude": 126.2,
+  "actual_distance_km": 40,
+  "padding_km": 5
+}
+```
+
+응답에는 외접/내접 박스, 네 방향 검색 박스, `candidate_stations` 배열이 포함됩니다.
 
 ### 선택 학습 요청
 
@@ -541,6 +570,9 @@ tests/schemas/
 
 - `tests/api/test_personalized_recommendation_api.py`  
   개인화 추천 API가 추천 결과와 flat `delivery_payload`를 반환하는지 검증합니다.
+
+- `tests/api/test_path_range_api.py`  
+  실제 경로 거리 기반 충전소 후보 검색 API를 검증합니다.
 
 - `tests/services/test_personalized_recommendation.py`  
   추천 서비스와 선택 기반 선호도 학습 공식이 의도대로 동작하는지 검증합니다.

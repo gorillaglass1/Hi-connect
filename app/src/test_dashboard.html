@@ -346,6 +346,31 @@
             color: white;
         }
 
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .scenario-chip {
+            background: rgba(93, 168, 255, 0.08);
+            border: 1px solid rgba(93, 168, 255, 0.18);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            color: var(--text-main);
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .scenario-chip:hover, .scenario-chip.active {
+            background: rgba(93, 168, 255, 0.16);
+            border-color: var(--primary-blue);
+            color: white;
+        }
+
         /* AI Prompt toggle area */
         .ai-toggle-container {
             display: flex;
@@ -583,6 +608,35 @@
             flex-wrap: wrap;
         }
 
+        .detour-analysis {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .detour-metric {
+            background: rgba(192, 255, 236, 0.04);
+            border: 1px solid rgba(192, 255, 236, 0.08);
+            border-radius: 8px;
+            padding: 7px 8px;
+            min-width: 0;
+        }
+
+        .detour-metric span {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.68rem;
+            margin-bottom: 2px;
+        }
+
+        .detour-metric strong {
+            display: block;
+            color: white;
+            font-size: 0.82rem;
+            font-weight: 800;
+        }
+
         .stat-item {
             font-size: 0.8rem;
             display: flex;
@@ -699,6 +753,11 @@
                 grid-template-columns: 1fr;
             }
 
+            .scenario-grid,
+            .detour-analysis {
+                grid-template-columns: 1fr;
+            }
+
             .score-circle {
                 width: 62px;
                 height: 62px;
@@ -792,6 +851,18 @@
                     </div>
                 </div>
 
+                <div class="form-group">
+                    <label class="form-label">우회거리 분석 시나리오</label>
+                    <div class="scenario-grid">
+                        <button class="scenario-chip" type="button" onclick="applyDetourScenario('route', this)">
+                            경로상 후보 우선
+                        </button>
+                        <button class="scenario-chip" type="button" onclick="applyDetourScenario('nearby', this)">
+                            가까워도 우회 큼
+                        </button>
+                    </div>
+                </div>
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div class="form-group">
                         <label class="form-label">현재 위도 (Lat)</label>
@@ -822,13 +893,6 @@
                     <input type="range" id="remainingRange" min="10" max="250" step="5" value="45" oninput="updateSliderLabelWithUnit(this, 'remainingRangeVal', ' km'); drawMap();">
                 </div>
 
-                <div class="form-group">
-                    <div class="form-label">
-                        <span><i class="fa-solid fa-circle-notch"></i> 반경 추가 버퍼 (알파)</span>
-                        <span class="value" id="alphaBufferVal">15 km</span>
-                    </div>
-                    <input type="range" id="alphaBuffer" min="5" max="50" step="5" value="15" oninput="updateSliderLabelWithUnit(this, 'alphaBufferVal', ' km'); drawMap();">
-                </div>
             </div>
         </div>
 
@@ -898,6 +962,7 @@
         // Global variables for coordinates and dummy data
         let stationsList = [];
         let allStations = [];
+        const DASHBOARD_AUTO_ALPHA_RATIO = 0.6;
         const userPresets = {
             1: { weight_price: 2.2, weight_waiting_time: 1.5, weight_distance: 1.0, weight_facilities: 0.5, safety_margin: 1.1 },
             2: { weight_price: 1.0, weight_waiting_time: 1.2, weight_distance: 2.5, weight_facilities: 1.2, safety_margin: 1.1 },
@@ -969,9 +1034,42 @@
             // Highlight chip
             const chips = document.querySelectorAll(".preset-chip");
             chips.forEach(c => c.classList.remove("active"));
-            event.target.classList.add("active");
+            if (typeof event !== "undefined" && event.target.classList.contains("preset-chip")) {
+                event.target.classList.add("active");
+            }
 
             drawMap();
+        }
+
+        function setRangeValue(id, labelId, value, unit = "") {
+            const slider = document.getElementById(id);
+            slider.value = value;
+            document.getElementById(labelId).innerText = `${value}${unit}`;
+        }
+
+        async function applyDetourScenario(type, sourceButton) {
+            document.querySelectorAll(".scenario-chip").forEach(chip => chip.classList.remove("active"));
+            sourceButton.classList.add("active");
+
+            document.getElementById("aiToggle").checked = false;
+            onAiToggleChanged();
+
+            setSlider("weightPrice", "weightPriceVal", 0.4);
+            setSlider("weightWait", "weightWaitVal", 0.4);
+            setSlider("weightDistance", "weightDistanceVal", 3.0);
+            setSlider("weightFacilities", "weightFacilitiesVal", 0.2);
+            setSlider("safetyMargin", "safetyMarginVal", 1.05);
+            setRangeValue("remainingRange", "remainingRangeVal", 100, " km");
+
+            if (type === "route") {
+                setPreset(37.4050, 126.7210, 37.4600, 126.4500, "detour-route");
+                logTerminal("Scenario: distance weight is high, so stations near the destination direction should rank better.");
+            } else {
+                setPreset(37.5665, 126.9780, 37.3910, 127.1120, "detour-nearby");
+                logTerminal("Scenario: nearby stations can lose rank when their detour distance is large.");
+            }
+
+            await fetchRecommendations();
         }
 
         async function onUserChanged() {
@@ -1076,13 +1174,13 @@
             const curLon = parseFloat(document.getElementById("curLon").value);
             const destLat = parseFloat(document.getElementById("destLat").value);
             const destLon = parseFloat(document.getElementById("destLon").value);
-            const alpha = parseFloat(document.getElementById("alphaBuffer").value);
 
             // Distance calculations
             const directDist = haversineDistFE(curLat, curLon, destLat, destLon);
-            const radius = directDist + alpha;
+            const autoAlpha = directDist * DASHBOARD_AUTO_ALPHA_RATIO;
+            const radius = directDist + autoAlpha;
 
-            document.getElementById("distanceOverlay").innerText = `직선거리: ${directDist.toFixed(1)} km / 검색반경: ${radius.toFixed(1)} km`;
+            document.getElementById("distanceOverlay").innerText = `직선거리: ${directDist.toFixed(1)} km / 서버 자동 후보 판단`;
 
             // Draw grid lines
             ctx.strokeStyle = "rgba(255, 255, 255, 0.02)";
@@ -1102,10 +1200,10 @@
 
             // Find bounds of all drawing items (Current, Destination, and bounding circle bounds)
             // We'll scale coordinates such that Current is centered and Bounding Circle fits comfortably
-            const minLat = Math.min(curLat, destLat) - (alpha/111);
-            const maxLat = Math.max(curLat, destLat) + (alpha/111);
-            const minLon = Math.min(curLon, destLon) - (alpha/(111*Math.cos(curLat*Math.PI/180)));
-            const maxLon = Math.max(curLon, destLon) + (alpha/(111*Math.cos(curLat*Math.PI/180)));
+            const minLat = Math.min(curLat, destLat) - (autoAlpha/111);
+            const maxLat = Math.max(curLat, destLat) + (autoAlpha/111);
+            const minLon = Math.min(curLon, destLon) - (autoAlpha/(111*Math.cos(curLat*Math.PI/180)));
+            const maxLon = Math.max(curLon, destLon) + (autoAlpha/(111*Math.cos(curLat*Math.PI/180)));
 
             const latSpan = maxLat - minLat;
             const lonSpan = maxLon - minLon;
@@ -1225,7 +1323,6 @@
             const destLat = parseFloat(document.getElementById("destLat").value);
             const destLon = parseFloat(document.getElementById("destLon").value);
             const remainingRange = parseFloat(document.getElementById("remainingRange").value);
-            const alpha = parseFloat(document.getElementById("alphaBuffer").value);
             const isAiEnabled = document.getElementById("aiToggle").checked;
             const nlQuery = isAiEnabled ? document.getElementById("aiPromptInput").value : null;
 
@@ -1245,7 +1342,6 @@
                 destination_latitude: destLat,
                 destination_longitude: destLon,
                 remaining_range: remainingRange,
-                alpha: alpha,
                 nl_query: nlQuery
             };
 
@@ -1293,6 +1389,11 @@
         function renderStationList(vehiclePayloads) {
             const listContainer = document.getElementById("recommendationResults");
             listContainer.innerHTML = "";
+            const curLat = parseFloat(document.getElementById("curLat").value);
+            const curLon = parseFloat(document.getElementById("curLon").value);
+            const destLat = parseFloat(document.getElementById("destLat").value);
+            const destLon = parseFloat(document.getElementById("destLon").value);
+            const directDistance = haversineDistFE(curLat, curLon, destLat, destLon);
 
             vehiclePayloads.forEach(vehiclePayload => {
                 const reachableBadge = vehiclePayload.is_reachable
@@ -1304,6 +1405,15 @@
                     : "<span class='highlight'>정보 없음</span>";
 
                 const facTags = vehiclePayload.facilities.map(f => `<span class="facility-tag">${f}</span>`).join(" ");
+                const routeTotal = directDistance + Number(vehiclePayload.detour_distance || 0);
+                const detourPercent = directDistance > 0
+                    ? (Number(vehiclePayload.detour_distance || 0) / directDistance) * 100
+                    : 0;
+                const detourLabel = detourPercent <= 8
+                    ? "낮음"
+                    : detourPercent <= 25
+                        ? "보통"
+                        : "높음";
 
                 const cardHtml = `
                     <div class="station-card">
@@ -1324,6 +1434,20 @@
                                 <div class="stat-item"><i class="fa-solid fa-won-sign"></i> 가격: ${priceText}</div>
                                 <div class="stat-item"><i class="fa-solid fa-clock"></i> 대기: <span class="highlight">${vehiclePayload.wait_vehicles}대</span> (${vehiclePayload.wait_time_minutes}분 소요)</div>
                                 <div class="stat-item"><i class="fa-solid fa-route"></i> 우회: <span class="highlight">${vehiclePayload.detour_distance} km</span></div>
+                            </div>
+                            <div class="detour-analysis">
+                                <div class="detour-metric">
+                                    <span>직선 기준</span>
+                                    <strong>${directDistance.toFixed(1)} km</strong>
+                                </div>
+                                <div class="detour-metric">
+                                    <span>경유 추정</span>
+                                    <strong>${routeTotal.toFixed(1)} km</strong>
+                                </div>
+                                <div class="detour-metric">
+                                    <span>우회 강도</span>
+                                    <strong>${detourPercent.toFixed(1)}% · ${detourLabel}</strong>
+                                </div>
                             </div>
                             <div class="station-reason">
                                 <i class="fa-solid fa-quote-left" style="font-size: 0.65rem; vertical-align: top; margin-right: 4px;"></i>

@@ -100,7 +100,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"user_id\": 1,\n  \"current_latitude\": 37.4050,\n  \"current_longitude\": 126.7210,\n  \"destination_latitude\": 37.4600,\n  \"destination_longitude\": 126.4500,\n  \"remaining_range\": 45.0,\n  \"alpha\": 15.0\n}"
+          "raw": "{\n  \"user_id\": 1,\n  \"current_latitude\": 37.4050,\n  \"current_longitude\": 126.7210,\n  \"destination_latitude\": 37.4600,\n  \"destination_longitude\": 126.4500,\n  \"remaining_range\": 45.0\n}"
         },
         "url": {
           "raw": "http://127.0.0.1:8000/recommendations/personalized",
@@ -117,7 +117,7 @@
             "personalized"
           ]
         },
-        "description": "목적지와 현재 위치 간의 직선거리 + 알파로 Bounding Circle 원을 계산하여 해당 내부에 있는 충전소를 개인 가중치(가격, 대기, 우회, 시설)로 다차원 매칭 정렬합니다."
+        "description": "목적지와 현재 위치 간의 직선거리 기준 검색 반경 버퍼를 서버가 자동 계산하여 해당 내부에 있는 충전소를 개인 가중치(가격, 대기, 우회, 시설)로 다차원 매칭 정렬합니다."
       },
       "response": []
     },
@@ -133,7 +133,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"user_id\": 1,\n  \"current_latitude\": 37.4050,\n  \"current_longitude\": 126.7210,\n  \"destination_latitude\": 37.4600,\n  \"destination_longitude\": 126.4500,\n  \"remaining_range\": 60.0,\n  \"alpha\": 15.0,\n  \"nl_query\": \"인천에 있고 가격이 9900원 이하이면서 세차장이 완비된 충전소\"\n}"
+          "raw": "{\n  \"user_id\": 1,\n  \"current_latitude\": 37.4050,\n  \"current_longitude\": 126.7210,\n  \"destination_latitude\": 37.4600,\n  \"destination_longitude\": 126.4500,\n  \"remaining_range\": 60.0,\n  \"nl_query\": \"인천에 있고 가격이 9900원 이하이면서 세차장이 완비된 충전소\"\n}"
         },
         "url": {
           "raw": "http://127.0.0.1:8000/recommendations/personalized",
@@ -166,7 +166,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"user_id\": 1,\n  \"current_latitude\": 37.4050,\n  \"current_longitude\": 126.7210,\n  \"destination_latitude\": 37.4600,\n  \"destination_longitude\": 126.4500,\n  \"remaining_range\": 45.0,\n  \"alpha\": 15.0,\n  \"nl_query\": \"인천에 있고 대기 차량이 적은 충전소\"\n}"
+          "raw": "{\n  \"user_id\": 1,\n  \"current_latitude\": 37.4050,\n  \"current_longitude\": 126.7210,\n  \"destination_latitude\": 37.4600,\n  \"destination_longitude\": 126.4500,\n  \"remaining_range\": 45.0,\n  \"nl_query\": \"인천에 있고 대기 차량이 적은 충전소\"\n}"
         },
         "url": {
           "raw": "http://127.0.0.1:8000/recommendations/personalized/delivery-payloads",

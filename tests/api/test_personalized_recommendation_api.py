@@ -76,7 +76,6 @@ def test_personalized_recommendation_returns_delivery_payload(client, monkeypatc
         "destination_latitude": 37.46,
         "destination_longitude": 126.45,
         "remaining_range": 45,
-        "alpha": 15,
         "nl_query": "인천에 있고 대기 차량이 적은 충전소",
     }
 
@@ -146,13 +145,170 @@ def test_personalized_recommendation_empty_text_to_sql_match_returns_empty_list(
             "destination_latitude": 37.46,
             "destination_longitude": 126.45,
             "remaining_range": 45,
-            "alpha": 15,
             "nl_query": "조건에 맞는 충전소 없음",
         },
     )
 
     assert res.status_code == 200
     assert res.json() == []
+
+
+def test_personalized_recommendation_exposes_detour_distance_scenarios(
+    client,
+    monkeypatch,
+):
+    async def use_detour_api_stations(self, _nl_query):
+        return ["API-DETOUR-LOW", "API-DETOUR-HIGH"]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_detour_api_stations,
+    )
+
+    user_res = client.post(
+        "/users",
+        json={
+            "name": "API 우회거리 사용자",
+            "phone": "010-3333-7777",
+            "email": "api-detour-user@example.com",
+        },
+    )
+    user_id = user_res.json()["user_id"]
+
+    client.put(
+        f"/users/{user_id}/preferences",
+        json={
+            "weight_price": "0.0",
+            "weight_waiting_time": "0.0",
+            "weight_distance": "3.0",
+            "weight_facilities": "0.0",
+            "safety_margin": "1.0",
+        },
+    )
+    client.post(
+        "/hydrogen-stations",
+        json={
+            "chrstn_mno": "API-DETOUR-LOW",
+            "chrstn_nm": "API 목적지 방향 저우회 충전소",
+            "road_nm_addr": "경로상",
+            "ntsl_pc": 10000,
+            "let": "37.0000",
+            "lon": "127.1000",
+            "oper_yn": "Y",
+        },
+    )
+    client.post(
+        "/hydrogen-stations",
+        json={
+            "chrstn_mno": "API-DETOUR-HIGH",
+            "chrstn_nm": "API 가까워 보이는 고우회 충전소",
+            "road_nm_addr": "경로 외곽",
+            "ntsl_pc": 10000,
+            "let": "37.0900",
+            "lon": "127.0000",
+            "oper_yn": "Y",
+        },
+    )
+
+    request_payload = {
+        "user_id": user_id,
+        "current_latitude": 37.0,
+        "current_longitude": 127.0,
+        "destination_latitude": 37.0,
+        "destination_longitude": 127.2,
+        "remaining_range": 100,
+        "nl_query": "우회거리 테스트 충전소만",
+    }
+    res = client.post("/recommendations/personalized", json=request_payload)
+
+    assert res.status_code == 200
+    body = res.json()
+    assert [item["chrstn_mno"] for item in body] == [
+        "API-DETOUR-LOW",
+        "API-DETOUR-HIGH",
+    ]
+    assert body[0]["detour_distance"] < 0.1
+    assert body[1]["detour_distance"] > 10.0
+    assert body[0]["sub_scores"]["distance"] > body[1]["sub_scores"]["distance"]
+    assert body[0]["delivery_payload"]["detour_distance"] == body[0]["detour_distance"]
+
+    vehicle_res = client.post(
+        "/recommendations/personalized/delivery-payloads",
+        json=request_payload,
+    )
+    assert vehicle_res.status_code == 200
+    vehicle_payloads = vehicle_res.json()
+    assert vehicle_payloads[0]["detour_distance"] < vehicle_payloads[1]["detour_distance"]
+
+
+def test_personalized_recommendation_can_use_path_range_filter(client, monkeypatch):
+    async def use_only_api_path_range_test_stations(self, _nl_query):
+        return [
+            "API-REC-PATH-RANGE-IN",
+            "API-REC-PATH-RANGE-INNER",
+            "API-REC-PATH-RANGE-OUT",
+        ]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_only_api_path_range_test_stations,
+    )
+
+    user_res = client.post(
+        "/users",
+        json={
+            "name": "API 실경로 추천 사용자",
+            "phone": "010-3333-8888",
+            "email": "api-path-range-rec-user@example.com",
+        },
+    )
+    user_id = user_res.json()["user_id"]
+
+    for station in [
+        {
+            "chrstn_mno": "API-REC-PATH-RANGE-IN",
+            "chrstn_nm": "API 추천 경로 범위 포함 충전소",
+            "let": "36.4200",
+            "lon": "128.5000",
+            "oper_yn": "Y",
+        },
+        {
+            "chrstn_mno": "API-REC-PATH-RANGE-INNER",
+            "chrstn_nm": "API 추천 경로 내부 제외 충전소",
+            "let": "36.5000",
+            "lon": "128.5000",
+            "oper_yn": "Y",
+        },
+        {
+            "chrstn_mno": "API-REC-PATH-RANGE-OUT",
+            "chrstn_nm": "API 추천 경로 범위 외부 충전소",
+            "let": "36.9000",
+            "lon": "128.9000",
+            "oper_yn": "Y",
+        },
+    ]:
+        client.post("/hydrogen-stations", json=station)
+
+    response = client.post(
+        "/recommendations/personalized/delivery-payloads",
+        json={
+            "user_id": user_id,
+            "current_latitude": 36.4,
+            "current_longitude": 128.4,
+            "destination_latitude": 36.6,
+            "destination_longitude": 128.6,
+            "remaining_range": 100,
+            "nl_query": None,
+        },
+    )
+
+    assert response.status_code == 200
+    assert {item["chrstn_mno"] for item in response.json()} == {
+        "API-REC-PATH-RANGE-IN",
+        "API-REC-PATH-RANGE-INNER",
+    }
 
 
 def test_personalized_recommendation_limits_response_to_top_five(client, monkeypatch):
@@ -198,7 +354,6 @@ def test_personalized_recommendation_limits_response_to_top_five(client, monkeyp
             "destination_latitude": 37.46,
             "destination_longitude": 126.45,
             "remaining_range": 100,
-            "alpha": 50,
             "nl_query": None,
         },
     )

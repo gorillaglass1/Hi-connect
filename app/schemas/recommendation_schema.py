@@ -1,15 +1,16 @@
 from decimal import Decimal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RecommendationSearchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     user_id: int = Field(..., description="사용자 ID")
     current_latitude: Decimal = Field(..., description="현재 위치 위도")
     current_longitude: Decimal = Field(..., description="현재 위치 경도")
     destination_latitude: Decimal = Field(..., description="목적지 위치 위도")
     destination_longitude: Decimal = Field(..., description="목적지 위치 경도")
     remaining_range: Decimal = Field(..., description="현재 차량 주행가능거리 (km)")
-    alpha: Decimal = Field(default=Decimal("15.0"), description="직선 거리 대비 검색 반경 버퍼 (km)")
     nl_query: str | None = Field(default=None, description="자연어 필터 검색 조건 (Text-to-SQL)")
 
 

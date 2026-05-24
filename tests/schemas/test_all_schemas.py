@@ -117,7 +117,7 @@ def test_recommendation_history_station_defaults_to_unselected():
     assert station.selected_at is None
 
 
-def test_recommendation_search_request_defaults_alpha_and_decimal_inputs():
+def test_recommendation_search_request_defaults_and_decimal_inputs():
     request = RecommendationSearchRequest(
         user_id=1,
         current_latitude="37.405",
@@ -127,9 +127,34 @@ def test_recommendation_search_request_defaults_alpha_and_decimal_inputs():
         remaining_range="45.0",
     )
 
-    assert request.alpha == Decimal("15.0")
     assert request.current_latitude == Decimal("37.405")
     assert request.nl_query is None
+
+
+def test_recommendation_search_request_rejects_client_alpha_inputs():
+    with pytest.raises(ValidationError):
+        RecommendationSearchRequest(
+            user_id=1,
+            current_latitude="37.405",
+            current_longitude="126.721",
+            destination_latitude="37.460",
+            destination_longitude="126.450",
+            remaining_range="45.0",
+            alpha="15.0",
+        )
+
+
+def test_recommendation_search_request_rejects_client_path_range_inputs():
+    with pytest.raises(ValidationError):
+        RecommendationSearchRequest(
+            user_id=1,
+            current_latitude="37.405",
+            current_longitude="126.721",
+            destination_latitude="37.460",
+            destination_longitude="126.450",
+            remaining_range="45.0",
+            actual_distance_km="40.0",
+        )
 
 
 def test_recommended_station_response_excludes_removed_nav_deeplink_field():
