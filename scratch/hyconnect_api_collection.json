@@ -1,0 +1,256 @@
+{
+  "info": {
+    "name": "Hy-Connect Hydrogen Station Personalized Recommendation API Collection",
+    "description": "수소충전소 개인화 추천, 사용자 선호도 설정 변경, Gemini 기반 Text-to-SQL 실시간 자연어 조건 검색, 그리고 현대자동차 순정 내비게이션 경유지 Push 전송 명령 시뮬레이션을 완벽하게 검증할 수 있는 통합 API 테스트 콜렉션입니다.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. 사용자 정보 조회 (GET /users/{user_id})",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://127.0.0.1:8000/users/1",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "users",
+            "1"
+          ]
+        },
+        "description": "지정된 사용자 고유 ID에 해당하는 프로필 정보 및 기본 개인 설정 가중치를 조회합니다."
+      },
+      "response": []
+    },
+    {
+      "name": "2. 사용자 가중치 설정 조회 (GET /users/{user_id}/preferences)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://127.0.0.1:8000/users/1/preferences",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "users",
+            "1",
+            "preferences"
+          ]
+        },
+        "description": "사용자가 중요하게 생각하는 수소 충전 요소(가격, 대기 시간, 우회 거리, 편의 시설 등)의 가중치를 조회합니다."
+      },
+      "response": []
+    },
+    {
+      "name": "3. 사용자 가중치 설정 변경 (PUT /users/{user_id}/preferences)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"weight_price\": 2.5,\n  \"weight_waiting_time\": 1.8,\n  \"weight_distance\": 1.2,\n  \"weight_facilities\": 0.8,\n  \"safety_margin\": 1.15\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/users/1/preferences",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "users",
+            "1",
+            "preferences"
+          ]
+        },
+        "description": "수소 충전소 개인 선호도를 동적으로 수정합니다. 가격 가중치를 대폭 늘리거나 줄인 상태에서 추천을 재시도하면 정렬 순서가 실시간으로 바뀝니다."
+      },
+      "response": []
+    },
+    {
+      "name": "4. 기본 개인화 수소충전소 정렬 및 검색 (POST /recommendations/personalized)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": 1,\n  \"current_latitude\": 37.4050,\n  \"current_longitude\": 126.7210,\n  \"destination_latitude\": 37.4600,\n  \"destination_longitude\": 126.4500,\n  \"remaining_range\": 45.0,\n  \"alpha\": 15.0\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/recommendations/personalized",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "recommendations",
+            "personalized"
+          ]
+        },
+        "description": "목적지와 현재 위치 간의 직선거리 + 알파로 Bounding Circle 원을 계산하여 해당 내부에 있는 충전소를 개인 가중치(가격, 대기, 우회, 시설)로 다차원 매칭 정렬합니다."
+      },
+      "response": []
+    },
+    {
+      "name": "5. AI 자연어 필터 기반 추천 정렬 (POST /recommendations/personalized with Text-to-SQL)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": 1,\n  \"current_latitude\": 37.4050,\n  \"current_longitude\": 126.7210,\n  \"destination_latitude\": 37.4600,\n  \"destination_longitude\": 126.4500,\n  \"remaining_range\": 60.0,\n  \"alpha\": 15.0,\n  \"nl_query\": \"인천에 있고 가격이 9900원 이하이면서 세차장이 완비된 충전소\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/recommendations/personalized",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "recommendations",
+            "personalized"
+          ]
+        },
+        "description": "자연어 질의(nl_query)를 바탕으로 Gemini 2.5 Flash를 이용해 안전한 SELECT 쿼리를 작성하여 DB 1차 매칭 후, 2차 개인화 랭킹 점수를 매겨 최적의 충전소를 추천합니다."
+      },
+      "response": []
+    },
+    {
+      "name": "6. 차량 전송용 추천 payload 조회 (POST /recommendations/personalized/delivery-payloads)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": 1,\n  \"current_latitude\": 37.4050,\n  \"current_longitude\": 126.7210,\n  \"destination_latitude\": 37.4600,\n  \"destination_longitude\": 126.4500,\n  \"remaining_range\": 45.0,\n  \"alpha\": 15.0,\n  \"nl_query\": \"인천에 있고 대기 차량이 적은 충전소\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/recommendations/personalized/delivery-payloads",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "recommendations",
+            "personalized",
+            "delivery-payloads"
+          ]
+        },
+        "description": "실제 차량 적용 영역에서 쓰는 flat payload 배열만 반환합니다. 응답에는 sub_scores, 중첩 delivery_payload, hyundai_nav_deeplink가 포함되지 않습니다."
+      },
+      "response": []
+    },
+    {
+      "name": "7. 경로안내 선택 기반 선호도 학습 (POST /users/:user_id/preferences/learn)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"chrstn_mno\": \"DUMMY-ICN-001\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/users/1/preferences/learn",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "users",
+            "1",
+            "preferences",
+            "learn"
+          ]
+        },
+        "description": "사용자가 추천 순위에서 경로안내를 누르면 충전소 관리번호만 전송합니다. 서버는 최신 추천 이력에 저장된 세부 점수를 관측 선호도로 사용해 개인화 가중치를 10% 학습률로 조정합니다."
+      },
+      "response": []
+    },
+    {
+      "name": "8. 최근 추천 이력 조회 (GET /recommendation-histories)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://127.0.0.1:8000/recommendation-histories?user_id=1",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "recommendation-histories"
+          ],
+          "query": [
+            {
+              "key": "user_id",
+              "value": "1"
+            }
+          ]
+        },
+        "description": "사용자의 과거 수소충전소 개인화 추천 이력 및 실제 선택 여부(selected, selected_at)를 조회합니다."
+      },
+      "response": []
+    }
+  ]
+}
