@@ -1462,7 +1462,11 @@
             logTerminal(`Route guidance selected for ${selectedPayload.chrstn_nm}. Updating preference weights...`);
 
             const learningPayload = {
-                chrstn_mno: selectedPayload.chrstn_mno
+                chrstn_mno: selectedPayload.chrstn_mno,
+                price_score: selectedPayload.sub_scores?.price ?? null,
+                waiting_time_score: selectedPayload.sub_scores?.waiting_time ?? null,
+                distance_score: selectedPayload.sub_scores?.distance ?? null,
+                facilities_score: selectedPayload.sub_scores?.facilities ?? null
             };
 
             try {

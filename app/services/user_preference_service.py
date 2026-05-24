@@ -75,7 +75,24 @@ class UserPreferenceService:
                 detail="Selected recommendation history was not found",
             )
 
-        score_values = _history_to_score_values(selected_history)
+        score_history = selected_history
+        if not _history_has_score_snapshot(score_history):
+            score_history = await recommendation_history_repo.get_latest_recommendation_history_with_score_snapshot(
+                self.db,
+                user_id=user_id,
+                chrstn_mno=payload.chrstn_mno,
+            )
+
+            score_values = _score_values_from_payload(payload)
+            if score_values is None and score_history is not None:
+                score_values = _history_to_score_values(score_history)
+            if score_values is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Selected recommendation history deos not have score snapshot "
+                )
+
+
         current_weights = {
             "weight_price": Decimal(str(pref.weight_price)),
             "weight_waiting_time": Decimal(str(pref.weight_waiting_time)),
@@ -172,22 +189,46 @@ def _non_negative_decimal(value: Decimal) -> Decimal:
     decimal_value = Decimal(str(value))
     return decimal_value if decimal_value > 0 else Decimal("0")
 
+def _history_has_score_snapshot(history) -> bool:
+    return all(
+        getattr(history, field) is not None
+        for field in (
+            "price_score",
+            "waiting_time_score",
+            "distance_score",
+            "facilities_score",
+        )
+    )
+
 
 def _history_to_score_values(history) -> dict[str, Decimal]:
-    score_values = {
-        "weight_price": history.price_score,
-        "weight_waiting_time": history.waiting_time_score,
-        "weight_distance": history.distance_score,
-        "weight_facilities": history.facilities_score,
+    return {
+        "weight_price": Decimal(str(history.price_score)),
+        "weight_waiting_time": Decimal(str(history.waiting_time_score)),
+        "weight_distance": Decimal(str(history.distance_score)),
+        "weight_facilities": Decimal(str(history.facilities_score))
     }
+
+def _score_values_from_payload(
+        payload: UserPreferenceLearningRequest,
+    )-> dict[str, Decimal] | None:
+    score_values = {
+        "weight_price": payload.price_score,
+        "weight_waiting_time": payload.waiting_score,
+        "weight_distance": payload.distance_score,
+        "weight_facilities": payload.facilities_score
+    }
+
+    if all(value is None for value in score_values.values()):
+        return None
+
     if any(value is None for value in score_values.values()):
         raise HTTPException(
-            status_code=409,
-            detail="Selected recommendation history does not have score snapshot",
+            status_code=422,
+            detail="All score fields are required when using client-side score fallback",
         )
 
     return {key: Decimal(str(value)) for key, value in score_values.items()}
-
 
 def _blend_weight(current: Decimal, observed: Decimal) -> Decimal:
     learned = (

@@ -89,6 +89,26 @@ async def get_latest_recommendation_history(
     )
     return result.scalar_one_or_none()
 
+async def get_latest_recommendation_history_with_score_snapshot(
+        db: AsyncSession,
+        *,
+        user_id: int,
+        chrstn_mno: str,
+)-> RecommendationHistory | None:
+    result = await db.execute(
+        select(RecommendationHistory)
+        .where(RecommendationHistory.user_id == user_id)
+        .where(RecommendationHistory.chrstn_mno == chrstn_mno)
+        .where(RecommendationHistory.price_score.isnot(None))
+        .where(RecommendationHistory.waiting_time_score.isnot(None))
+        .where(RecommendationHistory.distance_score.isnot(None))
+        .where(RecommendationHistory.facilities_score.isnot(None))
+        .order_by(RecommendationHistory.recommendation_id.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 
 async def mark_recommendation_selected(
     db: AsyncSession,
