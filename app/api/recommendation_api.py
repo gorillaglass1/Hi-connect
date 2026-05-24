@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.schemas.recommendation_request_schemas import (
+from app.schemas.recommendation_schema import (
     RecommendationSearchRequest,
     RecommendedStationResponse,
 )

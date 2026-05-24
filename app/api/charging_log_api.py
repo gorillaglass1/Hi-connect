@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.schemas.charging_log_schemas import ChargingLogCreate, ChargingLogResponse
+from app.schemas.charging_log_schema import ChargingLogCreate, ChargingLogResponse
 from app.services.charging_log_service import ChargingLogService
 
 router = APIRouter(prefix="/charging-logs", tags=["charging-logs"])

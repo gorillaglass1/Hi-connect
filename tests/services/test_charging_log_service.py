@@ -1,7 +1,7 @@
 import pytest
 
-from app.schemas.charging_log_schemas import ChargingLogCreate, ChargingLogItemCreate
-from app.schemas.hydrogen_stations_schemas import HydrogenStationCreate
+from app.schemas.charging_log_schema import ChargingLogCreate, ChargingLogItemCreate
+from app.schemas.hydrogen_station_schema import HydrogenStationCreate
 from app.services.charging_log_service import ChargingLogService
 from app.services.hydrogen_station_service import HydrogenStationService
 

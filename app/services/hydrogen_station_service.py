@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import hydrogen_station_repo
-from app.schemas.hydrogen_stations_schemas import (
+from app.schemas.hydrogen_station_schema import (
     HydrogenStationCreate,
     HydrogenStationDetailResponse,
     HydrogenStationResponse,

@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import charging_log_repo
-from app.schemas.charging_log_schemas import ChargingLogCreate
+from app.schemas.charging_log_schema import ChargingLogCreate
 
 
 class ChargingLogService:

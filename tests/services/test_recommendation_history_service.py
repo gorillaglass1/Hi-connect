@@ -1,6 +1,6 @@
 import pytest
 
-from app.schemas.hydrogen_stations_schemas import HydrogenStationCreate
+from app.schemas.hydrogen_station_schema import HydrogenStationCreate
 from app.schemas.recommendation_history_schema import (
     RecommendationHistoryCreate,
     RecommendationStationCreate,

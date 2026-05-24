@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.schemas.hydrogen_station_status_schemas import (
+from app.schemas.hydrogen_station_status_schema import (
     HydrogenStationStatusCreate,
     HydrogenStationStatusResponse,
 )

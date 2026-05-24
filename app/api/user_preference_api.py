@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.schemas.user_preference_schemas import (
+from app.schemas.user_preference_schema import (
     UserCreate,
+    UserPreferenceLearningRequest,
     UserPreferenceUpdate,
     UserPreferenceResponse,
     UserResponse,
@@ -43,3 +44,15 @@ async def update_user_preferences(
     db: AsyncSession = Depends(get_db),
 ):
     return await UserPreferenceService(db).update_user_preferences(user_id, payload)
+
+
+@router.post("/{user_id}/preferences/learn", response_model=UserPreferenceResponse)
+async def learn_user_preferences_from_selection(
+    user_id: int,
+    payload: UserPreferenceLearningRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    return await UserPreferenceService(db).learn_from_selected_recommendation(
+        user_id,
+        payload,
+    )

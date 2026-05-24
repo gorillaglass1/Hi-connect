@@ -4,8 +4,8 @@ from sqlalchemy.orm import contains_eager, joinedload
 
 from app.models.hydrogen_station_facilities import HydrogenStationAdditionalInfo
 from app.models.hydrogen_station_status import HydrogenStationStatus
-from app.models.hydrogen_stations import HydrogenStation
-from app.schemas.hydrogen_stations_schemas import HydrogenStationCreate
+from app.models.hydrogen_station import HydrogenStation
+from app.schemas.hydrogen_station_schema import HydrogenStationCreate
 
 
 async def create_hydrogen_station(

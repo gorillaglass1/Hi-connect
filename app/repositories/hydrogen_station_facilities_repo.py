@@ -2,8 +2,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.hydrogen_station_facilities import HydrogenStationAdditionalInfo
-from app.models.hydrogen_stations import HydrogenStation
-from app.schemas.hydrogen_station_facilities import (
+from app.models.hydrogen_station import HydrogenStation
+from app.schemas.hydrogen_station_facilities_schema import (
     HydrogenStationAdditionalInfoCreate,
 )
 

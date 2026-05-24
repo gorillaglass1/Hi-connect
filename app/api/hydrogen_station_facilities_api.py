@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.schemas.hydrogen_station_facilities import (
+from app.schemas.hydrogen_station_facilities_schema import (
     HydrogenStationAdditionalInfoCreate,
     HydrogenStationAdditionalInfoResponse,
 )

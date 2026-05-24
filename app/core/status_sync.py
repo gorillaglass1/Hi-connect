@@ -76,8 +76,15 @@ async def run_hydrogen_station_status_sync_loop() -> None:
 
     while True:
         try:
+            logger.info("Hydrogen station status sync tick started")
             result = await sync_hydrogen_station_status_once()
-            logger.info("Hydrogen station status synced: %s", result)
+            logger.info(
+                "Hydrogen station status sync tick finished: fetched=%s saved=%s skipped=%s next_run_in_seconds=%s",
+                result.get("fetched"),
+                result.get("saved"),
+                result.get("skipped"),
+                interval,
+            )
         except asyncio.CancelledError:
             raise
         except httpx.HTTPStatusError as exc:

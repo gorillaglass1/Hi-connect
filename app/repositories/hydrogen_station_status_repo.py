@@ -1,9 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.hydrogen_stations import HydrogenStation
+from app.models.hydrogen_station import HydrogenStation
 from app.models.hydrogen_station_status import HydrogenStationStatus
-from app.schemas.hydrogen_station_status_schemas import HydrogenStationStatusCreate
+from app.schemas.hydrogen_station_status_schema import HydrogenStationStatusCreate
 
 
 async def create_hydrogen_station_status(

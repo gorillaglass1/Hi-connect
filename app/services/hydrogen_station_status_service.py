@@ -1,8 +1,12 @@
+import logging
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import hydrogen_station_status_repo
-from app.schemas.hydrogen_station_status_schemas import HydrogenStationStatusCreate
+from app.schemas.hydrogen_station_status_schema import HydrogenStationStatusCreate
 from app.services.hying_client import HyingClient
+
+logger = logging.getLogger(__name__)
 
 
 class HydrogenStationStatusService:
@@ -33,13 +37,21 @@ class HydrogenStationStatusService:
         )
 
     async def sync_from_hying(self, params: dict | None = None):
+        logger.info("Starting hydrogen_station_status sync from Hying API: params=%s", params)
         items = await self.hying_client.fetch_station_statuses(params)
         payloads = [HydrogenStationStatusCreate.model_validate(item) for item in items]
         rows = await hydrogen_station_status_repo.upsert_hydrogen_station_statuses(
             self.db, payloads
         )
-        return {
+        result = {
             "fetched": len(items),
             "saved": len(rows),
             "skipped": len(items) - len(rows),
         }
+        logger.info(
+            "hydrogen_station_status table updated: fetched=%s saved=%s skipped=%s",
+            result["fetched"],
+            result["saved"],
+            result["skipped"],
+        )
+        return result

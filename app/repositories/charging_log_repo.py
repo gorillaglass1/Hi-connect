@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.charging_log import ChargingLog
-from app.schemas.charging_log_schemas import ChargingLogCreate
+from app.schemas.charging_log_schema import ChargingLogCreate
 
 
 async def create_charging_logs(

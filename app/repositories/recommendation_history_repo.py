@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,3 +68,27 @@ async def get_recommendation_histories(
     )
     result = await db.execute(query)
     return list(result.scalars().all())
+
+
+async def mark_latest_recommendation_selected(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    chrstn_mno: str,
+) -> RecommendationHistory | None:
+    result = await db.execute(
+        select(RecommendationHistory)
+        .where(RecommendationHistory.user_id == user_id)
+        .where(RecommendationHistory.chrstn_mno == chrstn_mno)
+        .order_by(RecommendationHistory.recommendation_id.desc())
+        .limit(1)
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None
+
+    row.selected = True
+    row.selected_at = datetime.now()
+    await db.commit()
+    await db.refresh(row)
+    return row

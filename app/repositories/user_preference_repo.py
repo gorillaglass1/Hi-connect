@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from app.models.user import User
 from app.models.user_preference import UserPreference
-from app.schemas.user_preference_schemas import UserCreate, UserPreferenceUpdate
+from app.schemas.user_preference_schema import UserCreate, UserPreferenceUpdate
 
 
 async def create_user(

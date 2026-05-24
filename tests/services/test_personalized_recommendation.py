@@ -2,9 +2,13 @@ import pytest
 from decimal import Decimal
 
 from app.models.user import User
-from app.schemas.hydrogen_stations_schemas import HydrogenStationCreate
-from app.schemas.user_preference_schemas import UserCreate, UserPreferenceUpdate
-from app.schemas.recommendation_request_schemas import RecommendationSearchRequest
+from app.schemas.hydrogen_station_schema import HydrogenStationCreate
+from app.schemas.user_preference_schema import (
+    UserCreate,
+    UserPreferenceLearningRequest,
+    UserPreferenceUpdate,
+)
+from app.schemas.recommendation_schema import RecommendationSearchRequest, SubScores
 from app.services.hydrogen_station_service import HydrogenStationService
 from app.services.user_preference_service import UserPreferenceService
 from app.services.recommendation_service import RecommendationService
@@ -137,8 +141,38 @@ async def test_personalized_recommendation_and_preferences(db_session, monkeypat
     assert recommendations[0].chrstn_mno == "TEST-ST-001"
     assert recommendations[0].final_score > 0.0
     assert recommendations[0].is_reachable is True
-    assert recommendations[0].delivery_payload.source == "HY_CONNECT"
-    assert recommendations[0].delivery_payload.user_id == 99
-    assert recommendations[0].delivery_payload.station.chrstn_mno == "TEST-ST-001"
-    assert recommendations[0].delivery_payload.route_context.remaining_range_km == 45.0
+    assert recommendations[0].delivery_payload.chrstn_mno == "TEST-ST-001"
+    assert recommendations[0].delivery_payload.chrstn_nm == recommendations[0].chrstn_nm
+    assert recommendations[0].delivery_payload.distance_to_station == recommendations[0].distance_to_station
+    assert recommendations[0].delivery_payload.detour_distance == recommendations[0].detour_distance
     assert recommendations[0].delivery_payload.final_score == recommendations[0].final_score
+
+
+@pytest.mark.asyncio
+async def test_learn_from_selected_recommendation_moves_weights_gradually(db_session):
+    service = UserPreferenceService(db_session)
+    user = await service.create_user(
+        UserCreate(
+            name="학습사용자",
+            phone="010-7777-8888",
+            email="learning-user@example.com",
+        )
+    )
+
+    updated_pref = await service.learn_from_selected_recommendation(
+        user.user_id,
+        UserPreferenceLearningRequest(
+            chrstn_mno="LEARN-ST-001",
+            sub_scores=SubScores(
+                price=40,
+                waiting_time=90,
+                distance=85,
+                facilities=25,
+            ),
+        ),
+    )
+
+    assert updated_pref.weight_price == Decimal("0.97")
+    assert updated_pref.weight_waiting_time == Decimal("1.05")
+    assert updated_pref.weight_distance == Decimal("1.04")
+    assert updated_pref.weight_facilities == Decimal("0.94")

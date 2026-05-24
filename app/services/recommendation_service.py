@@ -6,9 +6,9 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 
-from app.models.hydrogen_stations import HydrogenStation
+from app.models.hydrogen_station import HydrogenStation
 from app.repositories import user_preference_repo, recommendation_history_repo
-from app.schemas.recommendation_request_schemas import (
+from app.schemas.recommendation_schema import (
     RecommendationSearchRequest,
     RecommendedStationResponse,
     SubScores,
@@ -236,21 +236,23 @@ class RecommendationService:
             rounded_detour = round(detour, 2)
             recommendation_type = "PERSONALIZED" if not request.nl_query else "SEMANTIC_AI"
             station_address = st.road_nm_addr or st.lotno_addr
+            wait_time_minutes = wait_cars * 15
             delivery_payload = self.delivery_payload_service.build(
-                request=request,
-                recommendation_type=recommendation_type,
                 chrstn_mno=st.chrstn_mno,
                 chrstn_nm=st.chrstn_nm,
                 station_latitude=cand["lat"],
                 station_longitude=cand["lon"],
                 station_address=station_address,
+                ntsl_pc=st.ntsl_pc,
                 distance_to_station=rounded_distance_to_station,
-                distance_to_destination=rounded_distance_to_destination,
                 detour_distance=rounded_detour,
+                wait_vehicles=wait_cars,
+                wait_time_minutes=wait_time_minutes,
+                facilities=active_facilities,
                 is_reachable=is_reachable,
-                scores=rounded_scores,
                 final_score=rounded_final_score,
                 recommendation_reason=reason_str,
+                hyundai_nav_deeplink=deeplink,
             )
 
             scored_candidates.append(
@@ -263,7 +265,7 @@ class RecommendationService:
                     distance_to_destination=rounded_distance_to_destination,
                     detour_distance=rounded_detour,
                     wait_vehicles=wait_cars,
-                    wait_time_minutes=wait_cars * 15,
+                    wait_time_minutes=wait_time_minutes,
                     facilities=active_facilities,
                     is_reachable=is_reachable,
                     sub_scores=rounded_scores,

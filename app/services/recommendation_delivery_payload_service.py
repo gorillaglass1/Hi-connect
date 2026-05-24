@@ -1,10 +1,5 @@
-from app.schemas.recommendation_request_schemas import (
-    DeliveryRouteContext,
-    DeliveryStation,
-    GeoPoint,
+from app.schemas.recommendation_schema import (
     RecommendationDeliveryPayload,
-    RecommendationSearchRequest,
-    SubScores,
 )
 
 
@@ -14,49 +9,36 @@ class RecommendationDeliveryPayloadService:
     @staticmethod
     def build(
         *,
-        request: RecommendationSearchRequest,
-        recommendation_type: str,
         chrstn_mno: str,
         chrstn_nm: str,
         station_latitude: float,
         station_longitude: float,
         station_address: str | None,
+        ntsl_pc: int | None,
         distance_to_station: float,
-        distance_to_destination: float,
         detour_distance: float,
+        wait_vehicles: int,
+        wait_time_minutes: int,
+        facilities: list[str],
         is_reachable: bool,
-        scores: SubScores,
         final_score: float,
         recommendation_reason: str,
+        hyundai_nav_deeplink: str,
     ) -> RecommendationDeliveryPayload:
         return RecommendationDeliveryPayload(
-            user_id=request.user_id,
-            recommendation_type=recommendation_type,
-            station=DeliveryStation(
-                chrstn_mno=chrstn_mno,
-                name=chrstn_nm,
-                address=station_address,
-                location=GeoPoint(
-                    latitude=station_latitude,
-                    longitude=station_longitude,
-                ),
-            ),
-            route_context=DeliveryRouteContext(
-                current_location=GeoPoint(
-                    latitude=float(request.current_latitude),
-                    longitude=float(request.current_longitude),
-                ),
-                destination=GeoPoint(
-                    latitude=float(request.destination_latitude),
-                    longitude=float(request.destination_longitude),
-                ),
-                remaining_range_km=float(request.remaining_range),
-                distance_to_station_km=distance_to_station,
-                distance_to_destination_km=distance_to_destination,
-                detour_distance_km=detour_distance,
-                is_reachable=is_reachable,
-            ),
-            scores=scores,
+            chrstn_mno=chrstn_mno,
+            chrstn_nm=chrstn_nm,
+            road_nm_addr=station_address,
+            latitude=station_latitude,
+            longitude=station_longitude,
+            ntsl_pc=ntsl_pc,
+            distance_to_station=distance_to_station,
+            detour_distance=detour_distance,
+            wait_vehicles=wait_vehicles,
+            wait_time_minutes=wait_time_minutes,
+            facilities=facilities,
+            is_reachable=is_reachable,
             final_score=final_score,
             recommendation_reason=recommendation_reason,
+            hyundai_nav_deeplink=hyundai_nav_deeplink,
         )

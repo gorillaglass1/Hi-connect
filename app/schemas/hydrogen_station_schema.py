@@ -3,10 +3,10 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.schemas.hydrogen_station_facilities import (
+from app.schemas.hydrogen_station_facilities_schema import (
     HydrogenStationAdditionalInfoResponse,
 )
-from app.schemas.hydrogen_station_status_schemas import HydrogenStationStatusResponse
+from app.schemas.hydrogen_station_status_schema import HydrogenStationStatusResponse
 
 
 class HydrogenStationCreate(BaseModel):

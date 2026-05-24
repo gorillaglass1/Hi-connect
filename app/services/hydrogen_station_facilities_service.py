@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import hydrogen_station_facilities_repo
-from app.schemas.hydrogen_station_facilities import (
+from app.schemas.hydrogen_station_facilities_schema import (
     HydrogenStationAdditionalInfoCreate,
 )
 from app.services.hying_client import HyingClient

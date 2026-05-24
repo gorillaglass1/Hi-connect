@@ -1,11 +1,11 @@
 def test_personalized_recommendation_returns_delivery_payload(client, monkeypatch):
-    async def skip_text_to_sql_filter(self, _nl_query):
-        return None
+    async def use_only_api_test_stations(self, _nl_query):
+        return ["API-REC-ST-001", "API-REC-ST-002"]
 
     monkeypatch.setattr(
         "app.services.recommendation_candidate_filter_service."
         "RecommendationCandidateFilterService.filter_by_natural_language",
-        skip_text_to_sql_filter,
+        use_only_api_test_stations,
     )
 
     user_res = client.post(
@@ -88,11 +88,14 @@ def test_personalized_recommendation_returns_delivery_payload(client, monkeypatc
     assert len(body) > 0
     top = body[0]
     assert top["chrstn_mno"] == "API-REC-ST-001"
-    assert top["delivery_payload"]["source"] == "HY_CONNECT"
-    assert top["delivery_payload"]["user_id"] == user_id
-    assert top["delivery_payload"]["recommendation_type"] == "SEMANTIC_AI"
-    assert top["delivery_payload"]["station"]["chrstn_mno"] == "API-REC-ST-001"
-    assert top["delivery_payload"]["route_context"]["remaining_range_km"] == 45.0
+    assert top["delivery_payload"]["chrstn_mno"] == "API-REC-ST-001"
+    assert top["delivery_payload"]["chrstn_nm"] == top["chrstn_nm"]
+    assert top["delivery_payload"]["latitude"] == 37.41
+    assert top["delivery_payload"]["longitude"] == 126.7
+    assert top["delivery_payload"]["distance_to_station"] == top["distance_to_station"]
+    assert top["delivery_payload"]["detour_distance"] == top["detour_distance"]
+    assert top["delivery_payload"]["wait_vehicles"] == top["wait_vehicles"]
+    assert top["delivery_payload"]["facilities"] == top["facilities"]
     assert top["delivery_payload"]["final_score"] == top["final_score"]
 
 

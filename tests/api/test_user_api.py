@@ -57,3 +57,36 @@ def test_update_user_preferences(client):
     assert body["user_id"] == user_id
     assert body["weight_price"] == "2.20"
     assert body["safety_margin"] == "1.15"
+
+
+def test_learn_user_preferences_from_selected_recommendation(client):
+    create_res = client.post(
+        "/users",
+        json={
+            "name": "API 학습 사용자",
+            "phone": "010-2222-6666",
+            "email": "api-learning-user@example.com",
+        },
+    )
+    user_id = create_res.json()["user_id"]
+
+    learn_res = client.post(
+        f"/users/{user_id}/preferences/learn",
+        json={
+            "chrstn_mno": "LEARN-ST-001",
+            "sub_scores": {
+                "price": 40,
+                "waiting_time": 90,
+                "distance": 85,
+                "facilities": 25,
+            },
+        },
+    )
+
+    assert learn_res.status_code == 200
+    body = learn_res.json()
+    assert body["user_id"] == user_id
+    assert body["weight_price"] == "0.97"
+    assert body["weight_waiting_time"] == "1.05"
+    assert body["weight_distance"] == "1.04"
+    assert body["weight_facilities"] == "0.94"

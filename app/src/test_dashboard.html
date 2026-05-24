@@ -1001,19 +1001,20 @@
             <span class="modal-close" onclick="closeModal()">&times;</span>
             <div class="modal-header">
                 <i class="fa-solid fa-circle-check"></i>
-                <h3 class="modal-title">현대차 순정 내비게이션 전송 완료</h3>
+                <h3 class="modal-title">경로 안내 및 선호도 학습 완료</h3>
             </div>
             <div class="modal-body">
                 <p style="font-size: 0.95rem; line-height: 1.5;">
-                    차량 내부 <span style="font-weight: 700; color: var(--accent-emerald);">Gen5W / ccIC 내비게이션</span> 및 스마트폰 현대 블루링크 앱으로 원격 경유지 추가 신호가 성공적으로 push되었습니다. 차량 탑승 시 즉시 경유지가 반영된 경로 안내가 시작됩니다.
+                    선택한 충전소가 차량 내비게이션 경유지 payload로 정리되었고,
+                    사용자의 가격, 대기, 거리, 편의시설 선호도 가중치가 선택 결과를 기준으로 조금 조정되었습니다.
                 </p>
                 
-                <h4 style="font-size: 0.9rem; font-weight: 700; margin-top: 10px; color: var(--accent-cyan);">블루링크 CCS API 가상 전송 로그</h4>
+                <h4 style="font-size: 0.9rem; font-weight: 700; margin-top: 10px; color: var(--accent-cyan);">차량 전송용 추천 JSON</h4>
                 <div class="json-block" id="jsonBlock">
                     <!-- Dynamic JSON will go here -->
                 </div>
 
-                <h4 style="font-size: 0.9rem; font-weight: 700; color: var(--accent-cyan);">생성된 모바일 현대차 내비 딥링크 URL</h4>
+                <h4 style="font-size: 0.9rem; font-weight: 700; color: var(--accent-cyan);">현대차 내비 딥링크 URL</h4>
                 <div class="deeplink-display">
                     <span class="deeplink-text" id="deeplinkText">hyundainav://route?dest_lat=...</span>
             <button class="btn btn-secondary" style="width: auto; padding: 8px 12px; font-size: 0.8rem;" onclick="copyDeeplink()"><i class="fa-solid fa-copy"></i> 복사</button>
@@ -1459,58 +1460,68 @@
                             ${facTags ? `<div class="station-facilities">${facTags}</div>` : ""}
                         </div>
                         <div class="station-action">
-                            <button class="btn btn-nav-push" onclick="pushWaypoint('${st.chrstn_mno}')">
-                                <i class="fa-solid fa-paper-plane"></i> 내비 전송
+                            <button class="btn btn-nav-push" data-chrstn-mno="${st.chrstn_mno}">
+                                <i class="fa-solid fa-route"></i> 경로안내
                             </button>
                         </div>
                     </div>
                 `;
                 listContainer.innerHTML += cardHtml;
             });
+
+            document.querySelectorAll(".btn-nav-push").forEach(button => {
+                button.addEventListener("click", () => {
+                    pushWaypoint(button.dataset.chrstnMno);
+                });
+            });
         }
 
         async function pushWaypoint(chrstnMno) {
             const userId = document.getElementById("userSelector").value;
-            const destLat = parseFloat(document.getElementById("destLat").value);
-            const destLon = parseFloat(document.getElementById("destLon").value);
+            const selectedStation = stationsList.find(st => st.chrstn_mno === chrstnMno);
+            if (!selectedStation) {
+                logTerminal(`Selected station was not found in the latest recommendation list.`, "warning");
+                return;
+            }
 
-            logTerminal(`Sending telemetry push waypoint command to Connected Car Service for station ${chrstnMno}...`);
+            logTerminal(`Route guidance selected for ${selectedStation.chrstn_nm}. Updating preference weights...`);
 
-            const payload = {
-                user_id: parseInt(userId),
-                chrstn_mno: chrstnMno,
-                destination_latitude: destLat,
-                destination_longitude: destLon
+            const learningPayload = {
+                chrstn_mno: selectedStation.chrstn_mno,
+                sub_scores: selectedStation.sub_scores
             };
 
             try {
-                const res = await fetch("/navigation/push-waypoint", {
+                const res = await fetch(`/users/${userId}/preferences/learn`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(learningPayload)
                 });
 
                 if (res.ok) {
-                    const data = await res.json();
-                    logTerminal(`Hyundai Navigation waypoint added successfully!`, "success");
-                    
-                    // Show success modal
-                    showModal(data);
+                    const updatedPreference = await res.json();
+                    setSlider("weightPrice", "weightPriceVal", updatedPreference.weight_price);
+                    setSlider("weightWait", "weightWaitVal", updatedPreference.weight_waiting_time);
+                    setSlider("weightDistance", "weightDistanceVal", updatedPreference.weight_distance);
+                    setSlider("weightFacilities", "weightFacilitiesVal", updatedPreference.weight_facilities);
+                    setSlider("safetyMargin", "safetyMarginVal", updatedPreference.safety_margin);
+                    logTerminal(`Preference weights updated from selected station scores.`, "success");
+                    showModal(selectedStation.delivery_payload);
                 } else {
-                    logTerminal(`Push waypoint simulation failed.`, "warning");
-                    alert("내비게이션 전송 실패!");
+                    logTerminal(`Preference learning failed. status: ${res.status}`, "warning");
+                    alert("선택 학습 처리에 실패했습니다.");
                 }
             } catch (err) {
-                logTerminal(`Connection error during telematics push.`, "warning");
+                logTerminal(`Connection error during preference learning.`, "warning");
             }
         }
 
-        function showModal(data) {
+        function showModal(vehiclePayload) {
             const modal = document.getElementById("successModal");
-            document.getElementById("deeplinkText").innerText = data.deeplink_url;
+            document.getElementById("deeplinkText").innerText = vehiclePayload.hyundai_nav_deeplink;
             
             // Format JSON nicely
-            const jsonStr = JSON.stringify(data, null, 2);
+            const jsonStr = JSON.stringify(vehiclePayload, null, 2);
             const formatted = jsonStr
                 .replace(/"([^"]+)":/g, '<span class="key">"$1"</span>:')
                 .replace(/: "([^"]+)"/g, ': <span class="str">"$1"</span>')

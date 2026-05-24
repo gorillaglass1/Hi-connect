@@ -1,10 +1,10 @@
 import pytest
 
-from app.schemas.hydrogen_station_facilities import (
+from app.schemas.hydrogen_station_facilities_schema import (
     HydrogenStationAdditionalInfoCreate,
 )
-from app.schemas.hydrogen_station_status_schemas import HydrogenStationStatusCreate
-from app.schemas.hydrogen_stations_schemas import HydrogenStationCreate
+from app.schemas.hydrogen_station_status_schema import HydrogenStationStatusCreate
+from app.schemas.hydrogen_station_schema import HydrogenStationCreate
 from app.services.hydrogen_station_facilities_service import (
     HydrogenStationFacilitiesService,
 )
