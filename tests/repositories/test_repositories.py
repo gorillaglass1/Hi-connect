@@ -155,6 +155,37 @@ async def test_active_hydrogen_station_repo_filters_deleted_closed_and_candidate
 
 
 @pytest.mark.asyncio
+async def test_active_hydrogen_station_repo_loads_only_latest_status(
+    db_session,
+):
+    await _create_station(db_session, "REPO-ACTIVE-LATEST-STATUS")
+    await hydrogen_station_status_repo.create_hydrogen_station_status(
+        db_session,
+        HydrogenStationStatusCreate(
+            chrstn_mno="REPO-ACTIVE-LATEST-STATUS",
+            wait_vhcle_alge=5,
+            last_mdfcn_dt="20260524090000",
+        ),
+    )
+    await hydrogen_station_status_repo.create_hydrogen_station_status(
+        db_session,
+        HydrogenStationStatusCreate(
+            chrstn_mno="REPO-ACTIVE-LATEST-STATUS",
+            wait_vhcle_alge=1,
+            last_mdfcn_dt="20260524100000",
+        ),
+    )
+
+    active = await hydrogen_station_repo.get_active_hydrogen_stations_for_recommendation(
+        db_session,
+        candidate_station_ids=["REPO-ACTIVE-LATEST-STATUS"],
+    )
+
+    assert len(active) == 1
+    assert [status.wait_vhcle_alge for status in active[0].status_list] == [1]
+
+
+@pytest.mark.asyncio
 async def test_status_repo_upserts_only_existing_stations_and_returns_latest(
     db_session,
 ):
@@ -363,3 +394,49 @@ async def test_charging_log_repo_filters_orders_and_paginates(db_session):
     ]
     assert [log.chrstn_mno for log in station_logs] == ["REPO-LOG-001"]
     assert [log.charging_log_id for log in paged] == [created[0].charging_log_id]
+
+
+@pytest.mark.asyncio
+async def test_charging_log_repo_gets_recent_logs_for_recommendation_stats(
+    db_session,
+):
+    await _create_station(db_session, "REPO-RECENT-LOG-001")
+    await _create_station(db_session, "REPO-RECENT-LOG-002")
+    await _create_station(db_session, "REPO-RECENT-LOG-OUT")
+    created = await charging_log_repo.create_charging_logs(
+        db_session,
+        ChargingLogCreate(
+            user_id=889,
+            logs=[
+                ChargingLogItemCreate(
+                    chrstn_mno="REPO-RECENT-LOG-001",
+                    start_time=datetime(2026, 5, 24, 9, 0),
+                    end_time=datetime(2026, 5, 24, 9, 10),
+                ),
+                ChargingLogItemCreate(
+                    chrstn_mno="REPO-RECENT-LOG-002",
+                    start_time=datetime(2026, 5, 24, 10, 0),
+                    end_time=datetime(2026, 5, 24, 10, 10),
+                ),
+                ChargingLogItemCreate(
+                    chrstn_mno="REPO-RECENT-LOG-OUT",
+                    start_time=datetime(2026, 5, 24, 11, 0),
+                    end_time=datetime(2026, 5, 24, 11, 10),
+                ),
+            ],
+        ),
+    )
+
+    logs = await charging_log_repo.get_recent_charging_logs_for_stations(
+        db_session,
+        ["REPO-RECENT-LOG-001", "REPO-RECENT-LOG-002"],
+        limit=1,
+    )
+    empty = await charging_log_repo.get_recent_charging_logs_for_stations(
+        db_session,
+        [],
+    )
+
+    assert [log.charging_log_id for log in logs] == [created[1].charging_log_id]
+    assert logs[0].chrstn_mno == "REPO-RECENT-LOG-002"
+    assert empty == []

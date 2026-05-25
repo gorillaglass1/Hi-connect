@@ -1,10 +1,12 @@
 import math
 import logging
+from datetime import datetime, timedelta
 from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import (
+    charging_log_repo,
     hydrogen_station_repo,
     recommendation_history_repo,
 )
@@ -24,14 +26,18 @@ from app.services.recommendation_delivery_payload_service import (
     RecommendationDeliveryPayloadService,
 )
 from app.services.path_range_specification import find_charging_stations
+from app.services.queue_time_estimation_service import QueueTimeEstimationService
 from app.services.user_preference_service import UserPreferenceService
 
 logger = logging.getLogger("recommendation_service")
 
 RECOMMENDATION_RESPONSE_LIMIT = 5
+RECOMMENDATION_HISTORY_LOGS_PER_STATION = 20
 AUTO_ALPHA_RATIO = 0.60
 PATH_RANGE_ESTIMATED_ROUTE_RATIO = 1.60
 PATH_RANGE_PADDING_KM = 5.0
+ROUTE_MINUTES_PER_KM = 1.5
+WAIT_SCORE_DECAY_MINUTES = 18.0
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -52,6 +58,7 @@ class RecommendationService:
         self.db = db
         self.candidate_filter_service = RecommendationCandidateFilterService(db)
         self.delivery_payload_service = RecommendationDeliveryPayloadService()
+        self.queue_time_estimation_service = QueueTimeEstimationService()
 
     async def get_personalized_recommendations(
         self,
@@ -116,7 +123,7 @@ class RecommendationService:
         auto_alpha = 0.0 if use_path_range_filter else direct_dist * AUTO_ALPHA_RATIO
         search_radius = direct_dist + auto_alpha
 
-        # 3. Query all stations from DB with status and facilities relationships
+        # 3. Query active stations with latest realtime status and facilities
         stations = await hydrogen_station_repo.get_active_hydrogen_stations_for_recommendation(
             self.db,
             filtered_mno_list,
@@ -166,6 +173,15 @@ class RecommendationService:
         min_price = min(prices) if prices else 9000.0
         max_price = max(prices) if prices else 11000.0
         price_range = max_price - min_price
+        station_ids = [cand["model"].chrstn_mno for cand in candidate_stations]
+        recent_logs = await charging_log_repo.get_recent_charging_logs_for_stations(
+            self.db,
+            station_ids,
+            limit=max(100, len(station_ids) * RECOMMENDATION_HISTORY_LOGS_PER_STATION),
+        )
+        queue_history_stats = self.queue_time_estimation_service.build_history_stats(
+            recent_logs
+        )
 
         # 6. Score each candidate
         scored_candidates = []
@@ -185,11 +201,27 @@ class RecommendationService:
             else:
                 price_score = 100.0
 
-            # Waiting Time Score: fewer waiting cars is better
+            # Waiting Time Score: estimate actual queue time from realtime
+            # status, station capacity hints, and station-level charging logs.
             latest_status = st.status_list[0] if st.status_list else None
-            wait_cars = latest_status.wait_vhcle_alge if latest_status and latest_status.wait_vhcle_alge else 0
-            # Exponential decay: 0 cars -> 100, 3 cars -> 36.8, etc.
-            wait_score = 100.0 * math.exp(-wait_cars / 3.0)
+            arrival_minutes = int(round(dist_to_st * ROUTE_MINUTES_PER_KM))
+            arrival_time = datetime.now().astimezone(None) + timedelta(
+                minutes=arrival_minutes
+            )
+            queue_estimate = self.queue_time_estimation_service.estimate(
+                station=st,
+                status=latest_status,
+                history=queue_history_stats.get(st.chrstn_mno),
+                arrival_time=arrival_time,
+            )
+            wait_cars = queue_estimate.wait_vehicles
+            wait_time_minutes = queue_estimate.estimated_wait_minutes
+            if queue_estimate.service_available:
+                wait_score = 100.0 * math.exp(
+                    -wait_time_minutes / WAIT_SCORE_DECAY_MINUTES
+                )
+            else:
+                wait_score = 0.0
 
             # Distance Score: smaller detour is better
             # Exponential decay: 0km detour -> 100, 8km detour -> 36.8, etc.
@@ -215,6 +247,8 @@ class RecommendationService:
             else:
                 final_score = (price_score + wait_score + dist_score + fac_score) / 4.0
 
+            final_score *= queue_estimate.availability_multiplier
+
             # Reduce score significantly if unreachable
             if not is_reachable:
                 # Apply heavy penalty but keep in the list for visualization
@@ -226,8 +260,12 @@ class RecommendationService:
                 reasons.append("우회 거리가 최소화된 최적 경로 상에 있습니다.")
             if w_price >= 1.5 and price_val <= min_price + 300:
                 reasons.append("판매 가격이 저렴하여 경제적입니다.")
-            if w_wait >= 1.5 and wait_cars <= 1:
-                reasons.append("실시간 대기 차량이 적어 빠른 충전이 가능합니다.")
+            if not queue_estimate.service_available:
+                reasons.append("현재 운영/압력 상태가 좋지 않아 추천 우선순위를 낮췄습니다.")
+            elif w_wait >= 1.5 and wait_time_minutes <= 8:
+                reasons.append(f"예상 대기시간이 약 {wait_time_minutes}분으로 짧습니다.")
+            elif w_wait >= 1.5 and queue_estimate.reasons:
+                reasons.append(queue_estimate.reasons[0])
             if w_facilities >= 1.5 and fac_count >= 2:
                 reasons.append(f"주변 편의시설({', '.join(active_facilities[:2])})이 잘 구비되어 있습니다.")
 
@@ -249,9 +287,7 @@ class RecommendationService:
             rounded_distance_to_station = round(dist_to_st, 2)
             rounded_distance_to_destination = round(cand["dist_to_dest"], 2)
             rounded_detour = round(detour, 2)
-            recommendation_type = "PERSONALIZED" if not request.nl_query else "SEMANTIC_AI"
             station_address = st.road_nm_addr or st.lotno_addr
-            wait_time_minutes = wait_cars * 15
             delivery_payload = self.delivery_payload_service.build(
                 chrstn_mno=st.chrstn_mno,
                 chrstn_nm=st.chrstn_nm,
@@ -310,7 +346,9 @@ class RecommendationService:
                         waiting_time_score=Decimal(str(r.sub_scores.waiting_time)),
                         distance_score=Decimal(str(r.sub_scores.distance)),
                         facilities_score=Decimal(str(r.sub_scores.facilities)),
-                        estimated_arrival_time=int(r.distance_to_station * 1.5),  # rough estimate: 1.5 mins per km
+                        estimated_arrival_time=int(
+                            r.distance_to_station * ROUTE_MINUTES_PER_KM
+                        ),
                         selected=False,
                         selected_at=None,
                         recommendation_type="PERSONALIZED" if not request.nl_query else "SEMANTIC_AI",

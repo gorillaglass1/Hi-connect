@@ -174,21 +174,37 @@ async def get_active_hydrogen_stations_for_recommendation(
     db: AsyncSession,
     candidate_station_ids: list[str] | None = None,
 ) -> list[HydrogenStation]:
+    latest_status_id_subquery = (
+        select(HydrogenStationStatus.status_id)
+        .where(HydrogenStationStatus.chrstn_mno == HydrogenStation.chrstn_mno)
+        .order_by(
+            HydrogenStationStatus.last_mdfcn_dt.desc().nullslast(),
+            HydrogenStationStatus.status_id.desc(),
+        )
+        .limit(1)
+        .correlate(HydrogenStation)
+        .scalar_subquery()
+    )
     query = (
         select(HydrogenStation)
+        .outerjoin(
+            HydrogenStationStatus,
+            HydrogenStationStatus.status_id == latest_status_id_subquery,
+        )
         .where(HydrogenStation.oper_yn == "Y")
         .where(HydrogenStation.del_at == "0")
         .options(
-            selectinload(HydrogenStation.status_list),
+            contains_eager(HydrogenStation.status_list),
             selectinload(HydrogenStation.facilities_list),
         )
+        .execution_options(populate_existing=True)
     )
 
     if candidate_station_ids is not None:
         query = query.where(HydrogenStation.chrstn_mno.in_(candidate_station_ids))
 
     result = await db.execute(query)
-    return list(result.scalars().all())
+    return list(result.unique().scalars().all())
 
 
 async def upsert_hydrogen_stations(

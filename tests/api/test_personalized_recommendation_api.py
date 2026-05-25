@@ -1,3 +1,71 @@
+def test_personalized_recommendation_returns_queue_time_estimate_in_payload(
+    client,
+    monkeypatch,
+):
+    async def use_queue_estimate_api_station(self, _nl_query):
+        return ["API-QUEUE-ESTIMATE"]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_queue_estimate_api_station,
+    )
+
+    user_res = client.post(
+        "/users",
+        json={
+            "name": "API 대기시간 예측 사용자",
+            "phone": "010-3333-9991",
+            "email": "api-queue-estimate-user@example.com",
+        },
+    )
+    user_id = user_res.json()["user_id"]
+    client.post(
+        "/hydrogen-stations",
+        json={
+            "chrstn_mno": "API-QUEUE-ESTIMATE",
+            "chrstn_nm": "API 대기시간 예측 충전소",
+            "ntsl_pc": 10000,
+            "cmpt_yn": "Y",
+            "let": "37.0000",
+            "lon": "127.1000",
+            "oper_yn": "Y",
+        },
+    )
+    client.post(
+        "/hydrogen-station-status",
+        json={
+            "chrstn_mno": "API-QUEUE-ESTIMATE",
+            "wait_vhcle_alge": 4,
+            "tt_pressr": 700,
+            "prfect_elctc_posbl_alge": 10,
+            "oper_sttus_nm": "운영중",
+            "pos_sttus_nm": "영업중",
+        },
+    )
+
+    res = client.post(
+        "/recommendations/personalized",
+        json={
+            "user_id": user_id,
+            "current_latitude": 37.0,
+            "current_longitude": 127.0,
+            "destination_latitude": 37.0,
+            "destination_longitude": 127.2,
+            "remaining_range": 100,
+            "nl_query": "API 대기시간 예측 충전소만",
+        },
+    )
+
+    assert res.status_code == 200
+    top = res.json()[0]
+    assert top["wait_vehicles"] == 4
+    assert top["wait_time_minutes"] == 15
+    assert top["wait_time_minutes"] != top["wait_vehicles"] * 15
+    assert top["delivery_payload"]["wait_time_minutes"] == top["wait_time_minutes"]
+    assert top["delivery_payload"]["wait_vehicles"] == top["wait_vehicles"]
+
+
 def test_personalized_recommendation_returns_delivery_payload(client, monkeypatch):
     async def use_only_api_test_stations(self, _nl_query):
         return ["API-REC-ST-001", "API-REC-ST-002"]
@@ -312,13 +380,15 @@ def test_personalized_recommendation_can_use_path_range_filter(client, monkeypat
 
 
 def test_personalized_recommendation_limits_response_to_top_five(client, monkeypatch):
-    async def skip_text_to_sql_filter(self, _nl_query):
-        return None
+    limit_station_ids = [f"API-REC-LIMIT-{idx}" for idx in range(6)]
+
+    async def use_only_limit_test_stations(self, _nl_query):
+        return limit_station_ids
 
     monkeypatch.setattr(
         "app.services.recommendation_candidate_filter_service."
         "RecommendationCandidateFilterService.filter_by_natural_language",
-        skip_text_to_sql_filter,
+        use_only_limit_test_stations,
     )
 
     user_res = client.post(
@@ -335,12 +405,12 @@ def test_personalized_recommendation_limits_response_to_top_five(client, monkeyp
         client.post(
             "/hydrogen-stations",
             json={
-                "chrstn_mno": f"API-REC-LIMIT-{idx}",
+                "chrstn_mno": limit_station_ids[idx],
                 "chrstn_nm": f"API 추천 제한 충전소 {idx}",
                 "road_nm_addr": "인천광역시 남동구",
                 "ntsl_pc": 9500 + idx,
                 "let": str(37.405 + (idx * 0.001)),
-                "lon": str(126.721 + (idx * 0.001)),
+                "lon": str(126.721 - (idx * 0.01)),
                 "oper_yn": "Y",
             },
         )
@@ -354,7 +424,7 @@ def test_personalized_recommendation_limits_response_to_top_five(client, monkeyp
             "destination_latitude": 37.46,
             "destination_longitude": 126.45,
             "remaining_range": 100,
-            "nl_query": None,
+            "nl_query": "응답 제한 테스트 충전소만",
         },
     )
 

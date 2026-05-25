@@ -1,8 +1,11 @@
 import pytest
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from app.models.user import User
+from app.schemas.charging_log_schema import ChargingLogCreate, ChargingLogItemCreate
 from app.schemas.hydrogen_station_schema import HydrogenStationCreate
+from app.schemas.hydrogen_station_status_schema import HydrogenStationStatusCreate
 from app.schemas.user_preference_schema import (
     UserCreate,
     UserPreferenceLearningRequest,
@@ -13,7 +16,9 @@ from app.schemas.recommendation_history_schema import (
     RecommendationStationCreate,
 )
 from app.schemas.recommendation_schema import RecommendationSearchRequest
+from app.services.charging_log_service import ChargingLogService
 from app.services.hydrogen_station_service import HydrogenStationService
+from app.services.hydrogen_station_status_service import HydrogenStationStatusService
 from app.services.recommendation_history_service import RecommendationHistoryService
 from app.services.user_preference_service import UserPreferenceService
 from app.services.recommendation_service import RecommendationService
@@ -402,6 +407,268 @@ async def test_personalized_recommendation_uses_path_range_candidates(
         "REC-PATH-RANGE-IN",
         "REC-PATH-RANGE-INNER",
     }
+
+
+@pytest.mark.asyncio
+async def test_personalized_recommendation_uses_queue_time_history(
+    db_session,
+    monkeypatch,
+):
+    async def use_queue_history_test_stations(self, _nl_query):
+        return ["QUEUE-HISTORY-FAST", "QUEUE-HISTORY-SLOW"]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_queue_history_test_stations,
+    )
+    user = await UserPreferenceService(db_session).create_user(
+        UserCreate(
+            name="대기시간 히스토리 사용자",
+            phone="010-7777-0103",
+            email="queue-history-recommendation-user@example.com",
+        )
+    )
+    await UserPreferenceService(db_session).update_user_preferences(
+        user.user_id,
+        UserPreferenceUpdate(
+            weight_price=Decimal("0.0"),
+            weight_waiting_time=Decimal("3.0"),
+            weight_distance=Decimal("0.0"),
+            weight_facilities=Decimal("0.0"),
+            safety_margin=Decimal("1.0"),
+        ),
+    )
+
+    station_service = HydrogenStationService(db_session)
+    for station_id, name in [
+        ("QUEUE-HISTORY-FAST", "히스토리상 빠른 충전소"),
+        ("QUEUE-HISTORY-SLOW", "히스토리상 느린 충전소"),
+    ]:
+        await station_service.create_hydrogen_station(
+            HydrogenStationCreate(
+                chrstn_mno=station_id,
+                chrstn_nm=name,
+                ntsl_pc=10000,
+                let=Decimal("37.0000"),
+                lon=Decimal("127.1000"),
+                oper_yn="Y",
+            )
+        )
+        await HydrogenStationStatusService(db_session).create_hydrogen_station_status(
+            HydrogenStationStatusCreate(
+                chrstn_mno=station_id,
+                wait_vhcle_alge=0,
+                tt_pressr=700,
+                prfect_elctc_posbl_alge=10,
+                oper_sttus_nm="운영중",
+                pos_sttus_nm="영업중",
+            )
+        )
+
+    base_time = datetime(2026, 5, 24, 0, 0)
+    fast_logs = []
+    slow_logs = []
+    for hour in range(24):
+        started_at = base_time + timedelta(hours=hour)
+        fast_logs.append(
+            ChargingLogItemCreate(
+                chrstn_mno="QUEUE-HISTORY-FAST",
+                start_time=started_at,
+                end_time=started_at + timedelta(minutes=6),
+                waiting_time=0,
+            )
+        )
+        slow_logs.append(
+            ChargingLogItemCreate(
+                chrstn_mno="QUEUE-HISTORY-SLOW",
+                start_time=started_at,
+                end_time=started_at + timedelta(minutes=20),
+                waiting_time=30,
+            )
+        )
+
+    await ChargingLogService(db_session).create_charging_logs(
+        ChargingLogCreate(
+            user_id=user.user_id,
+            logs=fast_logs + slow_logs,
+        )
+    )
+
+    recommendations = await RecommendationService(
+        db_session
+    ).get_personalized_recommendations(
+        RecommendationSearchRequest(
+            user_id=user.user_id,
+            current_latitude=Decimal("37.0000"),
+            current_longitude=Decimal("127.0000"),
+            destination_latitude=Decimal("37.0000"),
+            destination_longitude=Decimal("127.2000"),
+            remaining_range=Decimal("100.0"),
+            nl_query="대기시간 히스토리 테스트 충전소만",
+        )
+    )
+
+    assert [rec.chrstn_mno for rec in recommendations] == [
+        "QUEUE-HISTORY-FAST",
+        "QUEUE-HISTORY-SLOW",
+    ]
+    assert recommendations[0].wait_time_minutes < recommendations[1].wait_time_minutes
+    assert recommendations[0].sub_scores.waiting_time > recommendations[1].sub_scores.waiting_time
+
+
+@pytest.mark.asyncio
+async def test_personalized_recommendation_penalizes_unavailable_queue_status(
+    db_session,
+    monkeypatch,
+):
+    async def use_status_penalty_test_stations(self, _nl_query):
+        return ["QUEUE-STATUS-OPEN", "QUEUE-STATUS-CLOSED"]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_status_penalty_test_stations,
+    )
+    user = await UserPreferenceService(db_session).create_user(
+        UserCreate(
+            name="운영상태 패널티 사용자",
+            phone="010-7777-0104",
+            email="queue-status-penalty-user@example.com",
+        )
+    )
+    await UserPreferenceService(db_session).update_user_preferences(
+        user.user_id,
+        UserPreferenceUpdate(
+            weight_price=Decimal("0.0"),
+            weight_waiting_time=Decimal("3.0"),
+            weight_distance=Decimal("0.0"),
+            weight_facilities=Decimal("0.0"),
+            safety_margin=Decimal("1.0"),
+        ),
+    )
+
+    station_service = HydrogenStationService(db_session)
+    for station_id in ["QUEUE-STATUS-OPEN", "QUEUE-STATUS-CLOSED"]:
+        await station_service.create_hydrogen_station(
+            HydrogenStationCreate(
+                chrstn_mno=station_id,
+                chrstn_nm=f"{station_id} 충전소",
+                ntsl_pc=10000,
+                let=Decimal("37.0000"),
+                lon=Decimal("127.1000"),
+                oper_yn="Y",
+            )
+        )
+
+    status_service = HydrogenStationStatusService(db_session)
+    await status_service.create_hydrogen_station_status(
+        HydrogenStationStatusCreate(
+            chrstn_mno="QUEUE-STATUS-OPEN",
+            wait_vhcle_alge=3,
+            tt_pressr=700,
+            prfect_elctc_posbl_alge=10,
+            oper_sttus_nm="운영중",
+            pos_sttus_nm="영업중",
+        )
+    )
+    await status_service.create_hydrogen_station_status(
+        HydrogenStationStatusCreate(
+            chrstn_mno="QUEUE-STATUS-CLOSED",
+            wait_vhcle_alge=0,
+            tt_pressr=0,
+            prfect_elctc_posbl_alge=0,
+            oper_sttus_nm="영업마감",
+            pos_sttus_nm="점검중",
+        )
+    )
+
+    recommendations = await RecommendationService(
+        db_session
+    ).get_personalized_recommendations(
+        RecommendationSearchRequest(
+            user_id=user.user_id,
+            current_latitude=Decimal("37.0000"),
+            current_longitude=Decimal("127.0000"),
+            destination_latitude=Decimal("37.0000"),
+            destination_longitude=Decimal("127.2000"),
+            remaining_range=Decimal("100.0"),
+            nl_query="운영상태 패널티 테스트 충전소만",
+        )
+    )
+
+    assert [rec.chrstn_mno for rec in recommendations] == [
+        "QUEUE-STATUS-OPEN",
+        "QUEUE-STATUS-CLOSED",
+    ]
+    closed = recommendations[1]
+    assert closed.wait_time_minutes == 180
+    assert closed.sub_scores.waiting_time == 0.0
+    assert closed.final_score < recommendations[0].final_score
+    assert "운영/압력 상태" in closed.recommendation_reason
+
+
+@pytest.mark.asyncio
+async def test_personalized_recommendation_uses_latest_status_snapshot(
+    db_session,
+    monkeypatch,
+):
+    async def use_latest_status_test_station(self, _nl_query):
+        return ["QUEUE-LATEST-STATUS"]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_latest_status_test_station,
+    )
+    user = await UserPreferenceService(db_session).create_user(
+        UserCreate(
+            name="최신상태 사용자",
+            phone="010-7777-0105",
+            email="queue-latest-status-user@example.com",
+        )
+    )
+    await HydrogenStationService(db_session).create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="QUEUE-LATEST-STATUS",
+            chrstn_nm="최신 상태 반영 충전소",
+            let=Decimal("37.0000"),
+            lon=Decimal("127.1000"),
+            oper_yn="Y",
+        )
+    )
+    status_service = HydrogenStationStatusService(db_session)
+    await status_service.create_hydrogen_station_status(
+        HydrogenStationStatusCreate(
+            chrstn_mno="QUEUE-LATEST-STATUS",
+            wait_vhcle_alge=9,
+            last_mdfcn_dt="20260524090000",
+        )
+    )
+    await status_service.create_hydrogen_station_status(
+        HydrogenStationStatusCreate(
+            chrstn_mno="QUEUE-LATEST-STATUS",
+            wait_vhcle_alge=1,
+            last_mdfcn_dt="20260524100000",
+        )
+    )
+
+    recommendations = await RecommendationService(
+        db_session
+    ).get_personalized_recommendations(
+        RecommendationSearchRequest(
+            user_id=user.user_id,
+            current_latitude=Decimal("37.0000"),
+            current_longitude=Decimal("127.0000"),
+            destination_latitude=Decimal("37.0000"),
+            destination_longitude=Decimal("127.2000"),
+            remaining_range=Decimal("100.0"),
+            nl_query="최신 상태 테스트 충전소만",
+        )
+    )
+
+    assert len(recommendations) == 1
+    assert recommendations[0].wait_vehicles == 1
 
 
 @pytest.mark.asyncio

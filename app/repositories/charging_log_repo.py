@@ -54,3 +54,21 @@ async def get_charging_logs(
     )
     result = await db.execute(query)
     return list(result.scalars().all())
+
+
+async def get_recent_charging_logs_for_stations(
+    db: AsyncSession,
+    station_ids: list[str],
+    limit: int = 1000,
+) -> list[ChargingLog]:
+    if not station_ids:
+        return []
+
+    query = (
+        select(ChargingLog)
+        .where(ChargingLog.chrstn_mno.in_(station_ids))
+        .order_by(ChargingLog.start_time.desc(), ChargingLog.charging_log_id.desc())
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    return list(result.scalars().all())
