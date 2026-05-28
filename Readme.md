@@ -152,7 +152,7 @@ Windows에서는 다음 명령을 사용합니다.
 ### 의존성 설치
 
 ```bash
-pip install fastapi aiosqlite sqlalchemy asyncpg pytest pytest-asyncio httpx email-validator greenlet google-genai
+pip install fastapi aiosqlite sqlalchemy asyncpg pytest pytest-asyncio httpx email-validator greenlet google-genai uvicorn
 ```
 
 ### 환경 변수 설정

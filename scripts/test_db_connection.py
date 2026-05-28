@@ -55,6 +55,13 @@ async def main() -> None:
     port = target["port"] or 5432
 
     print("DB target:", target)
+    if str(DB_URL).startswith("sqlite"):
+        async with engine.connect() as conn:
+            result = await conn.execute(text("SELECT 1"))
+            print("SQLite fallback connection OK:", result.scalar_one())
+        await engine.dispose()
+        return
+
     print("Connection kind:", _connection_kind(host, port, target["username"]))
 
     try:
