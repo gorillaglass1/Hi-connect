@@ -10,6 +10,8 @@ def test_build_delivery_payload_contains_stable_external_contract():
         station_latitude=37.46,
         station_longitude=126.45,
         station_address="인천광역시 중구",
+        vhcle_knd_cd="01",
+        vhcle_knd_nm="승용차",
         ntsl_pc=9900,
         distance_to_station=12.34,
         detour_distance=1.5,
@@ -25,6 +27,8 @@ def test_build_delivery_payload_contains_stable_external_contract():
     assert payload.chrstn_nm == "인천공항 수소충전소"
     assert payload.latitude == 37.46
     assert payload.longitude == 126.45
+    assert payload.vhcle_knd_cd == "01"
+    assert payload.vhcle_knd_nm == "승용차"
     assert payload.ntsl_pc == 9900
     assert payload.distance_to_station == 12.34
     assert payload.detour_distance == 1.5

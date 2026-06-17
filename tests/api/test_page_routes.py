@@ -3,7 +3,7 @@ def test_promo_page_serves_brochure_html(client):
 
     assert response.status_code == 200
     assert "HY-CONNECT" in response.text
-    assert "/static/hyconnect-hero.png" in response.text
+    assert "promo-hero" in response.text
     assert "대시보드 실행" in response.text
 
 
@@ -13,8 +13,8 @@ def test_dashboard_page_serves_learning_test_ui(client):
     assert response.status_code == 200
     assert "recommendations/personalized/delivery-payloads" in response.text
     assert "preferences/learn" in response.text
-    assert "경로안내" in response.text
-    assert "선택 학습이 완료되었습니다." in response.text
+    assert "경로 안내" in response.text
+    assert "선호 가중치가 학습되었습니다." in response.text
     assert "차량 전송용 추천 JSON" not in response.text
     assert "successModal" not in response.text
 

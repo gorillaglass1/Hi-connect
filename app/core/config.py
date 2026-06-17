@@ -52,7 +52,6 @@ def get_env_flag(name: str, default: bool = False) -> bool:
 
 def is_ai_reason_enabled() -> bool:
     """충전소별 추천 사유를 Gemini AI로 생성할지 여부.
-
     서버 메인 설정(.env)의 AI_REASON_ENABLED로 제어하며 기본값은 False(규칙 기반)이다.
     출력 속도를 위해 기본은 꺼두고, 필요할 때만 켠다.
     """
