@@ -3,7 +3,7 @@
 수소차 운전자를 위한 개인화 수소충전 경유지 추천 플랫폼입니다.  
 차량의 남은 주행가능거리, 충전소 실시간 상태, 대기 차량 수, 판매 가격, 편의시설, 사용자의 선호 가중치를 함께 계산해 실제로 도착하고 충전할 수 있는 충전소를 추천합니다.
 
-이 저장소는 FastAPI 백엔드, SQLAlchemy ORM, Supabase/PostgreSQL 연동, Hying API 동기화, Gemini Text-to-SQL 조건 필터, 추천 테스트 대시보드, 홍보용 웹페이지를 함께 포함합니다.
+이 저장소는 FastAPI 백엔드, SQLAlchemy ORM, Supabase/PostgreSQL 연동, Hying API 동기화, 규칙 기반 자연어 조건 필터, Gemini 기반 추천 사유 메시지 생성, 추천 테스트 대시보드, 홍보용 웹페이지를 함께 포함합니다.
 
 ---
 
@@ -180,7 +180,13 @@ GEMINI_API_KEY=your_gemini_api_key
 GOOGLE_API_KEY=
 ```
 
-Gemini 키가 없어도 기본 추천 기능은 동작합니다. 이 경우 자연어 Text-to-SQL 필터만 사용할 수 없습니다.
+AI 추천 사유 생성은 서버 메인 설정 `AI_REASON_ENABLED`로 켜고 끕니다. 기본값은 `false`로, 모든 추천 사유를 규칙 기반으로 빠르게 생성합니다. `true`로 바꾸고 Gemini 키가 설정되어 있으면 충전소별 추천 사유 메시지를 AI로 생성합니다.
+
+```env
+AI_REASON_ENABLED=false
+```
+
+Gemini 키가 없거나 스위치가 꺼져 있어도 기본 추천 기능과 자연어 후보 필터는 그대로 동작합니다. 이 경우 추천 사유는 규칙 기반 문구로 생성됩니다.
 
 ### 기존 DB 마이그레이션
 
@@ -232,9 +238,10 @@ FastAPI Router
 RecommendationService
   |
   |-- UserPreference 조회
-  |-- Gemini Text-to-SQL 후보 필터
+  |-- 규칙 기반 자연어 후보 필터
   |-- 충전소/상태/편의시설 DB 조회
   |-- 거리, 가격, 대기, 편의시설 점수 계산
+  |-- 추천 사유 메시지 생성 (AI_REASON_ENABLED=true면 Gemini, 아니면 규칙 기반)
   |-- 추천 결과 생성
   |-- 추천 이력 저장
   v
@@ -364,14 +371,14 @@ Hying API에서 실시간 상태 데이터를 가져와 `hydrogen_station_status
 처리 순서:
 
 1. 사용자 가중치 조회
-2. 자연어 조건이 있으면 Text-to-SQL 후보 필터 실행
+2. 자연어 조건이 있으면 규칙 기반 후보 필터 실행
 3. 운영 중이고 삭제되지 않은 충전소 조회
 4. 현재 위치, 목적지, 충전소 위치로 거리 계산
 5. 검색 반경 밖 후보 제외
 6. 가격, 대기, 거리, 편의시설 점수 계산
 7. 사용자 가중치로 최종 점수 계산
 8. 도달 불가능 후보는 점수에 페널티 적용
-9. 추천 사유 생성
+9. 상위 추천 충전소에 대해 추천 사유 메시지 생성 (`AI_REASON_ENABLED=true`면 Gemini 1회 배치 호출, 아니면/실패 시 규칙 기반)
 10. 차량 전송용 `delivery_payload` 생성
 11. 추천 이력 저장
 
@@ -414,9 +421,9 @@ POST /users/{user_id}/preferences/learn
 }
 ```
 
-### `app/services/text_to_sql_service.py`
+### `app/services/rule_based_station_filter_service.py`
 
-자연어 조건을 SQL로 바꾸는 역할을 합니다.
+자연어 조건을 규칙 기반으로 해석해 후보 충전소를 거릅니다. 외부 API 호출 없이 결정적으로 동작합니다.
 
 예:
 
@@ -424,7 +431,11 @@ POST /users/{user_id}/preferences/learn
 인천에 있고 가격이 9900원 이하인 세차장 있는 충전소
 ```
 
-이런 문장을 Gemini에 보내고, 안전한 `SELECT` 쿼리로 제한해 후보 충전소 관리번호 목록을 가져옵니다.
+이런 문장에서 지역(인천), 가격 상한(9900원 이하), 부대시설(세차장), 대기/영업 상태, 예약·실시간 여부 등을 추출해 SQLAlchemy 조건으로 변환하고 후보 충전소 관리번호 목록을 가져옵니다. 해석 가능한 조건이 하나도 없으면 전체 충전소를 채점 대상으로 둡니다.
+
+### `app/services/recommendation_reason_service.py`
+
+충전소별 추천 사유 메시지를 만듭니다. 서버 메인 설정 `AI_REASON_ENABLED`가 `true`이고 Gemini 키가 설정된 경우에만 추천 사유 문구를 Gemini API로 한 번에(배치) 생성합니다. 스위치가 꺼져 있거나 키가 없거나 호출이 실패하면 결정적인 규칙 기반 문구로 폴백합니다. 기본값은 꺼짐이라 추가 지연 없이 빠르게 동작합니다.
 
 ---
 
@@ -669,10 +680,10 @@ HYING_STATION_STATUS_ENDPOINT=/api/chrstnList/currentInfo
 서버를 `uvicorn index:app --reload`로 실행했는지 확인합니다.  
 정상 실행 중이면 5분마다 상태 sync tick 로그가 출력됩니다.
 
-### Gemini 자연어 필터가 동작하지 않음
+### Gemini 추천 사유 메시지가 생성되지 않음
 
 `GEMINI_API_KEY` 또는 `GOOGLE_API_KEY`가 설정되어 있는지 확인합니다.  
-키가 없어도 일반 추천은 동작합니다.
+키가 없으면 추천 사유 메시지는 규칙 기반 문구로 폴백하며, 그 외 추천 기능과 자연어 후보 필터는 정상 동작합니다.
 
 ---
 

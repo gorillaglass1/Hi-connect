@@ -11,7 +11,7 @@ class RecommendationSearchRequest(BaseModel):
     destination_latitude: Decimal = Field(..., description="목적지 위치 위도")
     destination_longitude: Decimal = Field(..., description="목적지 위치 경도")
     remaining_range: Decimal = Field(..., description="현재 차량 주행가능거리 (km)")
-    nl_query: str | None = Field(default=None, description="자연어 필터 검색 조건 (Text-to-SQL)")
+    nl_query: str | None = Field(default=None, description="자연어 필터 검색 조건 (규칙 기반 후보 필터링)")
 
 
 class SubScores(BaseModel):

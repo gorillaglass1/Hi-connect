@@ -24,7 +24,9 @@ async def search_personalized_recommendations(
     """
     사용자의 현재 위치, 목적지, 주행가능거리 및 개인 가중치를 활용하여
     반경 필터링 후 맞춤형 정렬 목록을 리턴합니다.
-    자연어 쿼리(nl_query)가 포함된 경우 Gemini AI Text-to-SQL 필터링을 거치게 됩니다.
+    자연어 쿼리(nl_query)가 포함된 경우 규칙 기반 후보 필터링을 거칩니다.
+    충전소별 추천 사유 메시지는 Gemini API로 생성하며, 키가 없거나 호출이
+    실패하면 규칙 기반 문구로 폴백합니다.
     """
     service = RecommendationService(db)
     return await service.get_personalized_recommendations(request)

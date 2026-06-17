@@ -25,6 +25,11 @@ from app.services.recommendation_candidate_filter_service import (
 from app.services.recommendation_delivery_payload_service import (
     RecommendationDeliveryPayloadService,
 )
+from app.services.recommendation_reason_service import (
+    RecommendationReasonService,
+    RecommendationWeights,
+    StationReasonFacts,
+)
 from app.services.path_range_specification import find_charging_stations
 from app.services.queue_time_estimation_service import QueueTimeEstimationService
 from app.services.user_preference_service import UserPreferenceService
@@ -59,6 +64,7 @@ class RecommendationService:
         self.candidate_filter_service = RecommendationCandidateFilterService(db)
         self.delivery_payload_service = RecommendationDeliveryPayloadService()
         self.queue_time_estimation_service = QueueTimeEstimationService()
+        self.reason_service = RecommendationReasonService()
 
     async def get_personalized_recommendations(
         self,
@@ -79,7 +85,7 @@ class RecommendationService:
         dest_lon = float(request.destination_longitude)
         direct_dist = haversine_distance(cur_lat, cur_lon, dest_lat, dest_lon)
 
-        # 2. Step 1: Optional Text-to-SQL candidate filter.
+        # 2. Step 1: Optional rule-based natural-language candidate filter.
         filtered_mno_list = await self.candidate_filter_service.filter_by_natural_language(
             request.nl_query
         )
@@ -184,6 +190,12 @@ class RecommendationService:
         )
 
         # 6. Score each candidate
+        weights = RecommendationWeights(
+            price=w_price,
+            wait=w_wait,
+            distance=w_distance,
+            facilities=w_facilities,
+        )
         scored_candidates = []
         for cand in candidate_stations:
             st = cand["model"]
@@ -254,29 +266,6 @@ class RecommendationService:
                 # Apply heavy penalty but keep in the list for visualization
                 final_score *= 0.1
 
-            # Generate natural language reason
-            reasons = []
-            if w_distance >= 1.5 and detour <= 2.0:
-                reasons.append("우회 거리가 최소화된 최적 경로 상에 있습니다.")
-            if w_price >= 1.5 and price_val <= min_price + 300:
-                reasons.append("판매 가격이 저렴하여 경제적입니다.")
-            if not queue_estimate.service_available:
-                reasons.append("현재 운영/압력 상태가 좋지 않아 추천 우선순위를 낮췄습니다.")
-            elif w_wait >= 1.5 and wait_time_minutes <= 8:
-                reasons.append(f"예상 대기시간이 약 {wait_time_minutes}분으로 짧습니다.")
-            elif w_wait >= 1.5 and queue_estimate.reasons:
-                reasons.append(queue_estimate.reasons[0])
-            if w_facilities >= 1.5 and fac_count >= 2:
-                reasons.append(f"주변 편의시설({', '.join(active_facilities[:2])})이 잘 구비되어 있습니다.")
-
-            if not reasons:
-                if is_reachable:
-                    reasons.append("사용자 가중치 분석 결과 전반적 매칭도가 매우 높습니다.")
-                else:
-                    reasons.append("현재 주행가능거리를 초과하여 경로 충전소로 도달이 불가능할 수 있습니다.")
-
-            reason_str = " ".join(reasons)
-
             rounded_scores = SubScores(
                 price=round(price_score, 1),
                 waiting_time=round(wait_score, 1),
@@ -288,48 +277,93 @@ class RecommendationService:
             rounded_distance_to_destination = round(cand["dist_to_dest"], 2)
             rounded_detour = round(detour, 2)
             station_address = st.road_nm_addr or st.lotno_addr
-            delivery_payload = self.delivery_payload_service.build(
-                chrstn_mno=st.chrstn_mno,
+
+            # Collect the facts needed to build the recommendation reason message later.
+            reason_facts = StationReasonFacts(
                 chrstn_nm=st.chrstn_nm,
-                station_latitude=cand["lat"],
-                station_longitude=cand["lon"],
-                station_address=station_address,
-                ntsl_pc=st.ntsl_pc,
+                price_val=price_val,
+                min_price=min_price,
+                detour_distance=detour,
                 distance_to_station=rounded_distance_to_station,
-                detour_distance=rounded_detour,
-                wait_vehicles=wait_cars,
+                service_available=queue_estimate.service_available,
                 wait_time_minutes=wait_time_minutes,
-                facilities=active_facilities,
+                queue_reasons=list(queue_estimate.reasons),
+                facility_count=fac_count,
+                active_facilities=active_facilities,
                 is_reachable=is_reachable,
-                final_score=rounded_final_score,
-                recommendation_reason=reason_str,
             )
 
             scored_candidates.append(
+                {
+                    "model": st,
+                    "lat": cand["lat"],
+                    "lon": cand["lon"],
+                    "station_address": station_address,
+                    "distance_to_station": rounded_distance_to_station,
+                    "distance_to_destination": rounded_distance_to_destination,
+                    "detour_distance": rounded_detour,
+                    "wait_vehicles": wait_cars,
+                    "wait_time_minutes": wait_time_minutes,
+                    "facilities": active_facilities,
+                    "is_reachable": is_reachable,
+                    "sub_scores": rounded_scores,
+                    "final_score": rounded_final_score,
+                    "reason_facts": reason_facts,
+                }
+            )
+
+        # 7. Sort by final score descending and keep the top recommendations
+        scored_candidates.sort(key=lambda x: x["final_score"], reverse=True)
+        top_candidates = scored_candidates[:RECOMMENDATION_RESPONSE_LIMIT]
+
+        # 8. Generate the per-station recommendation reason message. Only this step
+        #    uses the Gemini API (batched once); it falls back to deterministic
+        #    rule-based phrasing if the API is unavailable or fails.
+        reasons = await self.reason_service.generate_reasons(
+            [item["reason_facts"] for item in top_candidates],
+            weights,
+        )
+
+        limited_recommendations = []
+        for item, reason in zip(top_candidates, reasons):
+            st = item["model"]
+            delivery_payload = self.delivery_payload_service.build(
+                chrstn_mno=st.chrstn_mno,
+                chrstn_nm=st.chrstn_nm,
+                station_latitude=item["lat"],
+                station_longitude=item["lon"],
+                station_address=item["station_address"],
+                ntsl_pc=st.ntsl_pc,
+                distance_to_station=item["distance_to_station"],
+                detour_distance=item["detour_distance"],
+                wait_vehicles=item["wait_vehicles"],
+                wait_time_minutes=item["wait_time_minutes"],
+                facilities=item["facilities"],
+                is_reachable=item["is_reachable"],
+                final_score=item["final_score"],
+                recommendation_reason=reason,
+            )
+            limited_recommendations.append(
                 RecommendedStationResponse(
                     chrstn_mno=st.chrstn_mno,
                     chrstn_nm=st.chrstn_nm,
-                    road_nm_addr=station_address,
+                    road_nm_addr=item["station_address"],
                     ntsl_pc=st.ntsl_pc,
-                    distance_to_station=rounded_distance_to_station,
-                    distance_to_destination=rounded_distance_to_destination,
-                    detour_distance=rounded_detour,
-                    wait_vehicles=wait_cars,
-                    wait_time_minutes=wait_time_minutes,
-                    facilities=active_facilities,
-                    is_reachable=is_reachable,
-                    sub_scores=rounded_scores,
-                    final_score=rounded_final_score,
-                    recommendation_reason=reason_str,
+                    distance_to_station=item["distance_to_station"],
+                    distance_to_destination=item["distance_to_destination"],
+                    detour_distance=item["detour_distance"],
+                    wait_vehicles=item["wait_vehicles"],
+                    wait_time_minutes=item["wait_time_minutes"],
+                    facilities=item["facilities"],
+                    is_reachable=item["is_reachable"],
+                    sub_scores=item["sub_scores"],
+                    final_score=item["final_score"],
+                    recommendation_reason=reason,
                     delivery_payload=delivery_payload,
                 )
             )
 
-        # 7. Sort by final score descending
-        scored_candidates.sort(key=lambda x: x.final_score, reverse=True)
-        limited_recommendations = scored_candidates[:RECOMMENDATION_RESPONSE_LIMIT]
-
-        # 8. Record the top recommendations in history for analytics (up to top 5)
+        # 9. Record the top recommendations in history for analytics (up to top 5)
         top_recs = limited_recommendations
         if top_recs:
             history_payload = RecommendationHistoryCreate(
@@ -351,7 +385,7 @@ class RecommendationService:
                         ),
                         selected=False,
                         selected_at=None,
-                        recommendation_type="PERSONALIZED" if not request.nl_query else "SEMANTIC_AI",
+                        recommendation_type="PERSONALIZED" if not request.nl_query else "RULE_BASED_FILTER",
                     )
                     for r in top_recs
                 ]

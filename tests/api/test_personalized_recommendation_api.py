@@ -181,17 +181,17 @@ def test_personalized_recommendation_returns_delivery_payload(client, monkeypatc
     assert "hyundai_nav_deeplink" not in vehicle_payload
 
 
-def test_personalized_recommendation_empty_text_to_sql_match_returns_empty_list(
+def test_personalized_recommendation_empty_rule_based_match_returns_empty_list(
     client,
     monkeypatch,
 ):
-    async def return_empty_text_to_sql_match(self, _nl_query):
+    async def return_empty_rule_based_match(self, _nl_query):
         return []
 
     monkeypatch.setattr(
         "app.services.recommendation_candidate_filter_service."
         "RecommendationCandidateFilterService.filter_by_natural_language",
-        return_empty_text_to_sql_match,
+        return_empty_rule_based_match,
     )
 
     user_res = client.post(

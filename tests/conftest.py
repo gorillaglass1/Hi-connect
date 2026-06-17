@@ -14,6 +14,9 @@ os.environ["SUPABASE_DB_HOST"] = ""
 os.environ["SUPABASE_DB_PASSWORD"] = ""
 os.environ["HYING_STARTUP_SYNC_ENABLED"] = "false"
 os.environ["HYING_STATUS_SYNC_ENABLED"] = "false"
+# Keep tests offline/deterministic: never hit the Gemini API for reason generation.
+os.environ["GEMINI_API_KEY"] = ""
+os.environ["GOOGLE_API_KEY"] = ""
 
 from app.core.database import Base, get_db  # noqa: E402
 from index import app  # noqa: E402
