@@ -6,7 +6,7 @@ from app.schemas.path_range_schema import (
     PathRangeStationSearchResponse,
 )
 from app.schemas.recommendation_schema import (
-    RecommendationDeliveryPayload,
+    HydrogenStationCard,
     RecommendationSearchRequest,
     RecommendedStationResponse,
 )
@@ -34,19 +34,34 @@ async def search_personalized_recommendations(
 
 @router.post(
     "/personalized/delivery-payloads",
-    response_model=list[RecommendationDeliveryPayload],
+    response_model=list[HydrogenStationCard],
 )
 async def search_personalized_recommendation_delivery_payloads(
     request: RecommendationSearchRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    차량 적용 화면에서 사용할 수 있도록 추천 결과 중 차량 전송용 payload만 리턴합니다.
-    추천 이력은 서버에 저장되므로, 이후 경로안내 선택 학습은 chrstn_mno만 보내면 됩니다.
+    차량/앱 충전소 카드 화면에서 사용할 수 있도록 추천 결과를 카드 형식으로 리턴합니다.
+    추천 이력은 서버에 저장되므로, 이후 경로안내 선택 학습은 chrstn_mno(id)만 보내면 됩니다.
+    isRecommended는 점수가 가장 높은 최상위 추천 1개에만 true로 설정됩니다.
     """
     service = RecommendationService(db)
     recommendations = await service.get_personalized_recommendations(request)
-    return [recommendation.delivery_payload for recommendation in recommendations]
+    return [
+        HydrogenStationCard(
+            id=recommendation.delivery_payload.chrstn_mno,
+            name=recommendation.delivery_payload.chrstn_nm,
+            address=recommendation.delivery_payload.road_nm_addr,
+            status=recommendation.delivery_payload.oper_sttus_nm,
+            pressure_info=recommendation.delivery_payload.pressure_info,
+            distance_km=recommendation.distance_to_station,
+            wait_minutes=recommendation.wait_time_minutes,
+            is_recommended=(index == 0),
+            latitude=recommendation.delivery_payload.latitude,
+            longitude=recommendation.delivery_payload.longitude,
+        )
+        for index, recommendation in enumerate(recommendations)
+    ]
 
 
 @router.post(

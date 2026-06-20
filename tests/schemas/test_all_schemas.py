@@ -162,6 +162,8 @@ def test_recommended_station_response_excludes_removed_nav_deeplink_field():
         chrstn_mno="SCHEMA-REC-002",
         chrstn_nm="추천 충전소",
         road_nm_addr="인천광역시",
+        oper_sttus_nm="운영 중",
+        pressure_info="700bar 사용 가능",
         latitude=37.41,
         longitude=126.7,
         ntsl_pc=9500,

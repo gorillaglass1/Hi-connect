@@ -45,6 +45,29 @@ ROUTE_MINUTES_PER_KM = 1.5
 WAIT_SCORE_DECAY_MINUTES = 18.0
 
 
+def station_status_label(station, status) -> str:
+    """현재 운영 상태명을 추출하고, 실시간 상태가 없으면 운영 여부로 폴백합니다."""
+    if status is not None and getattr(status, "oper_sttus_nm", None):
+        return status.oper_sttus_nm
+    oper_yn = getattr(station, "oper_yn", None)
+    if oper_yn == "Y":
+        return "운영 중"
+    if oper_yn == "N":
+        return "운영 중지"
+    return "상태 정보 없음"
+
+
+SEVEN_HUNDRED_BAR_VEHICLE_KEYWORDS = ("트럭", "버스")
+
+
+def station_pressure_info(station) -> str:
+    """사용 가능 차종(vhcle_knd_nm)에 트럭/버스가 있으면 700bar 사용 가능으로 판단합니다."""
+    vehicle_kinds = getattr(station, "vhcle_knd_nm", None) or ""
+    if any(keyword in vehicle_kinds for keyword in SEVEN_HUNDRED_BAR_VEHICLE_KEYWORDS):
+        return "700bar 사용 가능"
+    return "700bar 사용 불가"
+
+
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
     Computes the geodesic distance in kilometers between two coordinates using the Haversine formula.
@@ -277,6 +300,8 @@ class RecommendationService:
             rounded_distance_to_destination = round(cand["dist_to_dest"], 2)
             rounded_detour = round(detour, 2)
             station_address = st.road_nm_addr or st.lotno_addr
+            status_label = station_status_label(st, latest_status)
+            pressure_info = station_pressure_info(st)
 
             # Collect the facts needed to build the recommendation reason message later.
             reason_facts = StationReasonFacts(
@@ -299,6 +324,8 @@ class RecommendationService:
                     "lat": cand["lat"],
                     "lon": cand["lon"],
                     "station_address": station_address,
+                    "status_label": status_label,
+                    "pressure_info": pressure_info,
                     "distance_to_station": rounded_distance_to_station,
                     "distance_to_destination": rounded_distance_to_destination,
                     "detour_distance": rounded_detour,
@@ -330,6 +357,8 @@ class RecommendationService:
             delivery_payload = self.delivery_payload_service.build(
                 chrstn_mno=st.chrstn_mno,
                 chrstn_nm=st.chrstn_nm,
+                oper_sttus_nm=item["status_label"],
+                pressure_info=item["pressure_info"],
                 station_latitude=item["lat"],
                 station_longitude=item["lon"],
                 station_address=item["station_address"],

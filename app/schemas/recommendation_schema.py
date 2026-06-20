@@ -21,10 +21,37 @@ class SubScores(BaseModel):
     facilities: float = Field(..., description="부대시설 부문 점수 (0-100)")
 
 
+class HydrogenStationCard(BaseModel):
+    """앱 충전소 카드 UI에 그대로 매핑되는 응답 형식 (camelCase JSON)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str = Field(..., serialization_alias="id", description="충전소 관리번호")
+    name: str = Field(..., serialization_alias="name", description="충전소 이름")
+    address: str | None = Field(None, serialization_alias="address", description="주소")
+    status: str = Field(..., serialization_alias="status", description="운영 상태")
+    pressure_info: str = Field(
+        ..., serialization_alias="pressureInfo", description="압력 정보"
+    )
+    distance_km: float = Field(
+        ..., serialization_alias="distanceKm", description="현재 위치에서 충전소까지의 거리 (km)"
+    )
+    wait_minutes: int = Field(
+        ..., serialization_alias="waitMinutes", description="예상 대기 시간 (분)"
+    )
+    is_recommended: bool = Field(
+        ..., serialization_alias="isRecommended", description="추천 여부 (최상위 추천 1개만 true)"
+    )
+    latitude: float = Field(..., serialization_alias="latitude", description="충전소 위도")
+    longitude: float = Field(..., serialization_alias="longitude", description="충전소 경도")
+
+
 class RecommendationDeliveryPayload(BaseModel):
     chrstn_mno: str = Field(..., description="충전소 관리번호")
     chrstn_nm: str = Field(..., description="충전소 이름")
     road_nm_addr: str | None = Field(None, description="도로명 주소")
+    oper_sttus_nm: str = Field(..., description="운영 상태명")
+    pressure_info: str = Field(..., description="압력 정보 (예: 700bar 사용 가능)")
     latitude: float = Field(..., description="충전소 위도")
     longitude: float = Field(..., description="충전소 경도")
     vhcle_knd_cd: str | None = Field(None, description="이용 가능 차량 종류 코드")

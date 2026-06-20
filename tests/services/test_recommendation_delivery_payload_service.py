@@ -7,6 +7,8 @@ def test_build_delivery_payload_contains_stable_external_contract():
     payload = RecommendationDeliveryPayloadService.build(
         chrstn_mno="REC-ST-001",
         chrstn_nm="인천공항 수소충전소",
+        oper_sttus_nm="운영 중",
+        pressure_info="700bar 사용 가능",
         station_latitude=37.46,
         station_longitude=126.45,
         station_address="인천광역시 중구",
@@ -25,6 +27,8 @@ def test_build_delivery_payload_contains_stable_external_contract():
 
     assert payload.chrstn_mno == "REC-ST-001"
     assert payload.chrstn_nm == "인천공항 수소충전소"
+    assert payload.oper_sttus_nm == "운영 중"
+    assert payload.pressure_info == "700bar 사용 가능"
     assert payload.latitude == 37.46
     assert payload.longitude == 126.45
     assert payload.vhcle_knd_cd == "01"

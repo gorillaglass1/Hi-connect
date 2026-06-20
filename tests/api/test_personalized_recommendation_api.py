@@ -175,7 +175,13 @@ def test_personalized_recommendation_returns_delivery_payload(client, monkeypatc
     )
     assert vehicle_res.status_code == 200
     vehicle_payload = vehicle_res.json()[0]
-    assert vehicle_payload["chrstn_mno"] == "API-REC-ST-001"
+    assert vehicle_payload["id"] == "API-REC-ST-001"
+    assert vehicle_payload["name"] == top["chrstn_nm"]
+    assert vehicle_payload["latitude"] == 37.41
+    assert vehicle_payload["longitude"] == 126.7
+    assert vehicle_payload["distanceKm"] == top["distance_to_station"]
+    assert vehicle_payload["waitMinutes"] == top["wait_time_minutes"]
+    assert vehicle_payload["isRecommended"] is True
     assert "delivery_payload" not in vehicle_payload
     assert "sub_scores" not in vehicle_payload
     assert "hyundai_nav_deeplink" not in vehicle_payload
@@ -307,7 +313,12 @@ def test_personalized_recommendation_exposes_detour_distance_scenarios(
     )
     assert vehicle_res.status_code == 200
     vehicle_payloads = vehicle_res.json()
-    assert vehicle_payloads[0]["detour_distance"] < vehicle_payloads[1]["detour_distance"]
+    assert [item["id"] for item in vehicle_payloads] == [
+        "API-DETOUR-LOW",
+        "API-DETOUR-HIGH",
+    ]
+    assert vehicle_payloads[0]["isRecommended"] is True
+    assert vehicle_payloads[1]["isRecommended"] is False
 
 
 def test_personalized_recommendation_can_use_path_range_filter(client, monkeypatch):
@@ -373,7 +384,7 @@ def test_personalized_recommendation_can_use_path_range_filter(client, monkeypat
     )
 
     assert response.status_code == 200
-    assert {item["chrstn_mno"] for item in response.json()} == {
+    assert {item["id"] for item in response.json()} == {
         "API-REC-PATH-RANGE-IN",
         "API-REC-PATH-RANGE-INNER",
     }
