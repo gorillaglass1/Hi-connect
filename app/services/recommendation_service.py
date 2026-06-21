@@ -32,7 +32,10 @@ from app.services.recommendation_reason_service import (
 )
 from app.services.path_range_specification import find_charging_stations
 from app.services.queue_time_estimation_service import QueueTimeEstimationService
-from app.services.user_preference_service import UserPreferenceService
+from app.services.user_preference_service import (
+    DEFAULT_USER_PREFERENCES,
+    UserPreferenceService,
+)
 
 logger = logging.getLogger("recommendation_service")
 
@@ -93,14 +96,19 @@ class RecommendationService:
         self,
         request: RecommendationSearchRequest,
     ) -> list[RecommendedStationResponse]:
-        # 1. Fetch user preference weights
-        pref = await UserPreferenceService(self.db).get_user_preferences(request.user_id)
+        # 1. Fetch user preference weights. When user_id is omitted (null),
+        #    skip personalization and apply a uniform weight of 1 to every factor.
+        if request.user_id is None:
+            w_price = w_wait = w_distance = w_facilities = 1.0
+            safety_margin = float(DEFAULT_USER_PREFERENCES.safety_margin)
+        else:
+            pref = await UserPreferenceService(self.db).get_user_preferences(request.user_id)
 
-        w_price = float(pref.weight_price)
-        w_wait = float(pref.weight_waiting_time)
-        w_distance = float(pref.weight_distance)
-        w_facilities = float(pref.weight_facilities)
-        safety_margin = float(pref.safety_margin)
+            w_price = float(pref.weight_price)
+            w_wait = float(pref.weight_waiting_time)
+            w_distance = float(pref.weight_distance)
+            w_facilities = float(pref.weight_facilities)
+            safety_margin = float(pref.safety_margin)
 
         cur_lat = float(request.current_latitude)
         cur_lon = float(request.current_longitude)
@@ -396,9 +404,10 @@ class RecommendationService:
                 )
             )
 
-        # 9. Record the top recommendations in history for analytics (up to top 5)
+        # 9. Record the top recommendations in history for analytics (up to top 5).
+        #    Anonymous requests (user_id is None) are not linked to a user, so skip.
         top_recs = limited_recommendations
-        if top_recs:
+        if top_recs and request.user_id is not None:
             history_payload = RecommendationHistoryCreate(
                 user_id=request.user_id,
                 user_latitude=Decimal(str(cur_lat)),

@@ -5,7 +5,10 @@ from pydantic import BaseModel, ConfigDict, Field
 class RecommendationSearchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    user_id: int = Field(..., description="사용자 ID")
+    user_id: int | None = Field(
+        default=None,
+        description="사용자 ID. null이면 개인화 없이 모든 가중치를 1로 적용합니다.",
+    )
     current_latitude: Decimal = Field(..., description="현재 위치 위도")
     current_longitude: Decimal = Field(..., description="현재 위치 경도")
     destination_latitude: Decimal = Field(..., description="목적지 위치 위도")
