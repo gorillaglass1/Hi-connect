@@ -43,6 +43,9 @@ RECOMMENDATION_RESPONSE_LIMIT = 5
 RECOMMENDATION_HISTORY_LOGS_PER_STATION = 20
 AUTO_ALPHA_RATIO = 0.60
 PATH_RANGE_ESTIMATED_ROUTE_RATIO = 1.60
+# When no destination is provided, recommend stations within this straight-line
+# radius (km) of the current location. Reachability still further constrains it.
+NEARBY_SEARCH_RADIUS_KM = 15.0
 PATH_RANGE_PADDING_KM = 5.0
 ROUTE_MINUTES_PER_KM = 1.5
 WAIT_SCORE_DECAY_MINUTES = 18.0
@@ -112,9 +115,18 @@ class RecommendationService:
 
         cur_lat = float(request.current_latitude)
         cur_lon = float(request.current_longitude)
-        dest_lat = float(request.destination_latitude)
-        dest_lon = float(request.destination_longitude)
-        direct_dist = haversine_distance(cur_lat, cur_lon, dest_lat, dest_lon)
+        # 목적지는 선택값. 위/경도가 모두 있으면 경로 기반 추천, 없으면 현위치 근처 추천.
+        has_destination = (
+            request.destination_latitude is not None
+            and request.destination_longitude is not None
+        )
+        if has_destination:
+            dest_lat = float(request.destination_latitude)
+            dest_lon = float(request.destination_longitude)
+            direct_dist = haversine_distance(cur_lat, cur_lon, dest_lat, dest_lon)
+        else:
+            dest_lat = dest_lon = None
+            direct_dist = 0.0
 
         # 2. Step 1: Optional rule-based natural-language candidate filter.
         filtered_mno_list = await self.candidate_filter_service.filter_by_natural_language(
@@ -123,42 +135,48 @@ class RecommendationService:
         if filtered_mno_list == []:
             return []
 
+        # 2-1. Path-range envelope filter only applies when a destination is given.
         use_path_range_filter = False
-        try:
-            estimated_route_distance = direct_dist * PATH_RANGE_ESTIMATED_ROUTE_RATIO
-            path_range_result = await find_charging_stations(
-                self.db,
-                x_lat=cur_lat,
-                x_lng=cur_lon,
-                y_lat=dest_lat,
-                y_lng=dest_lon,
-                actual_distance_km=estimated_route_distance,
-                padding_km=PATH_RANGE_PADDING_KM,
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if has_destination:
+            try:
+                estimated_route_distance = direct_dist * PATH_RANGE_ESTIMATED_ROUTE_RATIO
+                path_range_result = await find_charging_stations(
+                    self.db,
+                    x_lat=cur_lat,
+                    x_lng=cur_lon,
+                    y_lat=dest_lat,
+                    y_lng=dest_lon,
+                    actual_distance_km=estimated_route_distance,
+                    padding_km=PATH_RANGE_PADDING_KM,
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-        path_range_mno_list = [
-            station.chrstn_mno
-            for station in path_range_result["candidate_stations"]
-        ]
-        if path_range_mno_list:
-            if filtered_mno_list is None:
-                filtered_mno_list = path_range_mno_list
-                use_path_range_filter = True
-            else:
-                path_range_ids = set(path_range_mno_list)
-                filtered_mno_list = [
-                    chrstn_mno
-                    for chrstn_mno in filtered_mno_list
-                    if chrstn_mno in path_range_ids
-                ]
-                use_path_range_filter = True
-                if not filtered_mno_list:
-                    return []
+            path_range_mno_list = [
+                station.chrstn_mno
+                for station in path_range_result["all_candidate_stations"]
+            ]
+            if path_range_mno_list:
+                if filtered_mno_list is None:
+                    filtered_mno_list = path_range_mno_list
+                    use_path_range_filter = True
+                else:
+                    path_range_ids = set(path_range_mno_list)
+                    filtered_mno_list = [
+                        chrstn_mno
+                        for chrstn_mno in filtered_mno_list
+                        if chrstn_mno in path_range_ids
+                    ]
+                    use_path_range_filter = True
+                    if not filtered_mno_list:
+                        return []
 
-        auto_alpha = 0.0 if use_path_range_filter else direct_dist * AUTO_ALPHA_RATIO
-        search_radius = direct_dist + auto_alpha
+        if not has_destination:
+            # Nearby mode: bound candidates by a fixed radius around the current location.
+            search_radius = NEARBY_SEARCH_RADIUS_KM
+        else:
+            auto_alpha = 0.0 if use_path_range_filter else direct_dist * AUTO_ALPHA_RATIO
+            search_radius = direct_dist + auto_alpha
 
         # 3. Query active stations with latest realtime status and facilities
         stations = await hydrogen_station_repo.get_active_hydrogen_stations_for_recommendation(
@@ -185,11 +203,18 @@ class RecommendationService:
             if not use_path_range_filter and dist_to_station > search_radius:
                 continue
 
-            # Distance from station to destination
-            dist_to_dest = haversine_distance(st_lat, st_lon, dest_lat, dest_lon)
-            
-            # Detour distance
-            detour_dist = max(0.0, dist_to_station + dist_to_dest - direct_dist)
+            if has_destination:
+                # Distance from station to destination, and the detour incurred by
+                # routing through this station. Distance scoring rewards low detour.
+                dist_to_dest = haversine_distance(st_lat, st_lon, dest_lat, dest_lon)
+                detour_dist = max(0.0, dist_to_station + dist_to_dest - direct_dist)
+                score_distance = detour_dist
+            else:
+                # Nearby mode: no destination, so there is no detour. Distance
+                # scoring rewards proximity to the current location instead.
+                dist_to_dest = 0.0
+                detour_dist = 0.0
+                score_distance = dist_to_station
 
             candidate_stations.append({
                 "model": st,
@@ -198,6 +223,7 @@ class RecommendationService:
                 "dist_to_station": dist_to_station,
                 "dist_to_dest": dist_to_dest,
                 "detour_distance": detour_dist,
+                "score_distance": score_distance,
             })
 
             if st.ntsl_pc:
@@ -232,10 +258,18 @@ class RecommendationService:
             st = cand["model"]
             dist_to_st = cand["dist_to_station"]
             detour = cand["detour_distance"]
+            score_distance = cand["score_distance"]
 
-            # Reachability Check
+            # Reachability Check: skip stations the vehicle cannot reach with the
+            # current remaining range. Real roads are longer than the straight line,
+            # so estimate the actual road distance by applying the route detour ratio
+            # before comparing against the remaining range with the user's safety
+            # margin. Unreachable stations are excluded entirely so they never surface.
             rem_range = float(request.remaining_range)
-            is_reachable = (dist_to_st * safety_margin) <= rem_range
+            estimated_road_dist = dist_to_st * PATH_RANGE_ESTIMATED_ROUTE_RATIO
+            is_reachable = (estimated_road_dist * safety_margin) <= rem_range
+            if not is_reachable:
+                continue
 
             # Price Score: cheaper is better
             price_val = st.ntsl_pc if st.ntsl_pc else min_price
@@ -266,9 +300,10 @@ class RecommendationService:
             else:
                 wait_score = 0.0
 
-            # Distance Score: smaller detour is better
-            # Exponential decay: 0km detour -> 100, 8km detour -> 36.8, etc.
-            dist_score = 100.0 * math.exp(-detour / 8.0)
+            # Distance Score: smaller distance is better. With a destination this is
+            # the route detour; in nearby mode it is the distance to the station.
+            # Exponential decay: 0km -> 100, 8km -> 36.8, etc.
+            dist_score = 100.0 * math.exp(-score_distance / 8.0)
 
             # Facilities Score: more additional services is better
             active_facilities = [
@@ -291,11 +326,6 @@ class RecommendationService:
                 final_score = (price_score + wait_score + dist_score + fac_score) / 4.0
 
             final_score *= queue_estimate.availability_multiplier
-
-            # Reduce score significantly if unreachable
-            if not is_reachable:
-                # Apply heavy penalty but keep in the list for visualization
-                final_score *= 0.1
 
             rounded_scores = SubScores(
                 price=round(price_score, 1),
@@ -324,6 +354,7 @@ class RecommendationService:
                 facility_count=fac_count,
                 active_facilities=active_facilities,
                 is_reachable=is_reachable,
+                has_destination=has_destination,
             )
 
             scored_candidates.append(

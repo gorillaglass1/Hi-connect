@@ -1,5 +1,5 @@
 from decimal import Decimal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class RecommendationSearchRequest(BaseModel):
@@ -11,10 +11,26 @@ class RecommendationSearchRequest(BaseModel):
     )
     current_latitude: Decimal = Field(..., description="현재 위치 위도")
     current_longitude: Decimal = Field(..., description="현재 위치 경도")
-    destination_latitude: Decimal = Field(..., description="목적지 위치 위도")
-    destination_longitude: Decimal = Field(..., description="목적지 위치 경도")
+    destination_latitude: Decimal | None = Field(
+        default=None,
+        description="목적지 위치 위도. 위/경도를 모두 생략하면 현재 위치 근처 충전소를 추천합니다.",
+    )
+    destination_longitude: Decimal | None = Field(
+        default=None,
+        description="목적지 위치 경도. 위/경도를 모두 생략하면 현재 위치 근처 충전소를 추천합니다.",
+    )
     remaining_range: Decimal = Field(..., description="현재 차량 주행가능거리 (km)")
     nl_query: str | None = Field(default=None, description="자연어 필터 검색 조건 (규칙 기반 후보 필터링)")
+
+    @model_validator(mode="after")
+    def _validate_destination_pair(self) -> "RecommendationSearchRequest":
+        has_lat = self.destination_latitude is not None
+        has_lon = self.destination_longitude is not None
+        if has_lat != has_lon:
+            raise ValueError(
+                "destination_latitude and destination_longitude must be provided together."
+            )
+        return self
 
 
 class SubScores(BaseModel):

@@ -710,7 +710,7 @@ async def test_personalized_recommendation_returns_empty_when_no_active_stations
 
 
 @pytest.mark.asyncio
-async def test_personalized_recommendation_penalizes_unreachable_station(
+async def test_personalized_recommendation_excludes_unreachable_station(
     db_session,
     monkeypatch,
 ):
@@ -753,10 +753,85 @@ async def test_personalized_recommendation_penalizes_unreachable_station(
         )
     )
 
-    assert len(recommendations) == 1
-    assert recommendations[0].is_reachable is False
-    assert recommendations[0].final_score < 10
-    assert "초과" in recommendations[0].recommendation_reason
+    # 주행가능거리를 초과해 도달할 수 없는 충전소는 추천 결과에서 완전히 제외된다.
+    assert recommendations == []
+
+
+@pytest.mark.asyncio
+async def test_recommendation_without_destination_returns_nearby_stations(
+    db_session,
+    monkeypatch,
+):
+    async def use_nearby_test_stations(self, _nl_query):
+        return ["TEST-ST-NEAR", "TEST-ST-MID", "TEST-ST-FAR"]
+
+    monkeypatch.setattr(
+        "app.services.recommendation_candidate_filter_service."
+        "RecommendationCandidateFilterService.filter_by_natural_language",
+        use_nearby_test_stations,
+    )
+    station_service = HydrogenStationService(db_session)
+    # 현위치(37.4050, 126.7210) 기준: 가까운 / 중간(반경 내) / 먼(반경 밖) 충전소
+    await station_service.create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="TEST-ST-NEAR",
+            chrstn_nm="가까운 충전소",
+            ntsl_pc=9500,
+            let=Decimal("37.4150"),
+            lon=Decimal("126.7210"),
+            oper_yn="Y",
+        )
+    )
+    await station_service.create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="TEST-ST-MID",
+            chrstn_nm="중간 거리 충전소",
+            ntsl_pc=9500,
+            let=Decimal("37.5050"),
+            lon=Decimal("126.7210"),
+            oper_yn="Y",
+        )
+    )
+    await station_service.create_hydrogen_station(
+        HydrogenStationCreate(
+            chrstn_mno="TEST-ST-FAR",
+            chrstn_nm="먼 충전소",
+            ntsl_pc=9500,
+            let=Decimal("37.7050"),
+            lon=Decimal("126.7210"),
+            oper_yn="Y",
+        )
+    )
+
+    recommendations = await RecommendationService(
+        db_session
+    ).get_personalized_recommendations(
+        RecommendationSearchRequest(
+            current_latitude=Decimal("37.4050"),
+            current_longitude=Decimal("126.7210"),
+            remaining_range=Decimal("100.0"),
+        )
+    )
+
+    returned_ids = [r.chrstn_mno for r in recommendations]
+    # 반경(15km) 밖의 먼 충전소는 제외되고, 가까운/중간 충전소만 남는다.
+    assert returned_ids == ["TEST-ST-NEAR", "TEST-ST-MID"]
+    nearest = recommendations[0]
+    # 목적지가 없으므로 우회/목적지거리 개념은 0이고, 거리 점수는 현위치 기준이다.
+    assert nearest.detour_distance == 0.0
+    assert nearest.distance_to_destination == 0.0
+    assert nearest.sub_scores.distance > recommendations[1].sub_scores.distance
+
+
+@pytest.mark.asyncio
+async def test_recommendation_rejects_partial_destination(db_session):
+    with pytest.raises(ValueError):
+        RecommendationSearchRequest(
+            current_latitude=Decimal("37.4050"),
+            current_longitude=Decimal("126.7210"),
+            destination_latitude=Decimal("37.4600"),
+            remaining_range=Decimal("100.0"),
+        )
 
 
 @pytest.mark.asyncio

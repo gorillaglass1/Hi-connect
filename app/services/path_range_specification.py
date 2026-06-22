@@ -244,4 +244,5 @@ async def find_charging_stations(
         "left_box": left_box,
         "right_box": right_box,
         "candidate_stations": candidate_stations,
+        "all_candidate_stations": stations_in_outer,
     }

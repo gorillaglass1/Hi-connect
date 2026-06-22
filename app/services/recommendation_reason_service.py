@@ -41,6 +41,8 @@ class StationReasonFacts:
     facility_count: int = 0
     active_facilities: list[str] = field(default_factory=list)
     is_reachable: bool = True
+    # False일 때는 목적지가 없어 현위치 근처 추천 모드임을 의미한다.
+    has_destination: bool = True
 
 
 class RecommendationReasonService:
@@ -68,8 +70,13 @@ class RecommendationReasonService:
     ) -> str:
         """기존 규칙 기반 추천 사유 문구. Gemini 폴백으로도 사용된다."""
         reasons: list[str] = []
-        if weights.distance >= 1.5 and facts.detour_distance <= 2.0:
-            reasons.append("우회 거리가 최소화된 최적 경로 상에 있습니다.")
+        if weights.distance >= 1.5:
+            if facts.has_destination and facts.detour_distance <= 2.0:
+                reasons.append("우회 거리가 최소화된 최적 경로 상에 있습니다.")
+            elif not facts.has_destination and facts.distance_to_station <= 3.0:
+                reasons.append(
+                    f"현재 위치에서 약 {facts.distance_to_station}km로 가깝습니다."
+                )
         if weights.price >= 1.5 and facts.price_val <= facts.min_price + 300:
             reasons.append("판매 가격이 저렴하여 경제적입니다.")
         if not facts.service_available:
@@ -137,6 +144,7 @@ class RecommendationReasonService:
                 "충전소명": facts.chrstn_nm,
                 "판매가격": facts.price_val,
                 "후보_최저가격": facts.min_price,
+                "목적지_지정": facts.has_destination,
                 "우회거리_km": round(facts.detour_distance, 2),
                 "현위치_거리_km": round(facts.distance_to_station, 2),
                 "운영_가능": facts.service_available,
@@ -158,6 +166,7 @@ class RecommendationReasonService:
 - 가중치가 높은 항목(가격/대기시간/거리/편의시설)을 우선해서 강조하세요.
 - "운영_가능"이 false이면 현재 이용이 어려울 수 있음을 부드럽게 안내하세요.
 - "도달_가능"이 false이면 주행가능거리를 초과할 수 있음을 안내하세요.
+- "목적지_지정"이 false이면 목적지가 없는 상황이므로 우회거리 대신 현위치_거리_km(가까움)를 기준으로 안내하고, "경로 상" 같은 표현은 쓰지 마세요.
 - 각 메시지는 80자 이내로 간결하게 작성하세요.
 
 사용자 가중치(클수록 중요):
