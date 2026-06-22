@@ -5,11 +5,21 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.core.database import Base, get_db
-from index import app
-
-TEST_DB_PATH = "./test_user_api.db"
+TEST_DB_PATH = "./test_hydrogen_station_api.db"
 TEST_DB_URL = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
+
+os.environ["DATABASE_URL"] = TEST_DB_URL
+os.environ["SUPABASE_DB_URL"] = ""
+os.environ["SUPABASE_DB_HOST"] = ""
+os.environ["SUPABASE_DB_PASSWORD"] = ""
+os.environ["HYING_STARTUP_SYNC_ENABLED"] = "false"
+os.environ["HYING_STATUS_SYNC_ENABLED"] = "false"
+# Keep tests offline/deterministic: never hit the Gemini API for reason generation.
+os.environ["GEMINI_API_KEY"] = ""
+os.environ["GOOGLE_API_KEY"] = ""
+
+from app.core.database import Base, get_db  # noqa: E402
+from index import app  # noqa: E402
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -39,6 +49,7 @@ async def db_session(engine) -> AsyncSession:
         class_=AsyncSession,
         autocommit=False,
         autoflush=False,
+        expire_on_commit=False,
     )
     async with session_factory() as session:
         yield session
