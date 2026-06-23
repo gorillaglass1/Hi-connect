@@ -16,6 +16,7 @@ from app.api.recommendation_history_api import (
 )
 from app.api.recommendation_api import router as recommendation_router
 from app.api.user_preference_api import router as user_preference_router
+from app.api.weather_api import router as weather_router
 from app.core.database import Base, engine
 from app.core.hying_startup_sync import sync_hying_hydrogen_data_on_startup
 from app.core.schema_migrations import apply_runtime_schema_migrations
@@ -59,6 +60,7 @@ app.include_router(recommendation_history_router)
 app.include_router(charging_log_router)
 app.include_router(user_preference_router)
 app.include_router(recommendation_router)
+app.include_router(weather_router)
 
 
 @app.get("/")
