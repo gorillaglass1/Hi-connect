@@ -58,6 +58,15 @@ def is_ai_reason_enabled() -> bool:
     return get_env_flag("AI_REASON_ENABLED", default=False)
 
 
+def is_dashboard_ai_enabled() -> bool:
+    """대시보드 통합 인사이트를 Gemini AI로 생성할지 여부.
+    충전소 추천 사유(AI_REASON_ENABLED)와 독립적인 스위치로, .env의
+    DASHBOARD_AI_ENABLED로 제어한다. 기본값은 True(키가 있으면 AI 사용)이며,
+    꺼두면 LLM 호출 없이 백엔드 폴백만으로 응답한다.
+    """
+    return get_env_flag("DASHBOARD_AI_ENABLED", default=True)
+
+
 def _is_valid_env_key(key: str) -> bool:
     if not key:
         return False

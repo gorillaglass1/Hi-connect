@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
 from app.api.charging_log_api import router as charging_log_router
+from app.api.dashboard_api import router as dashboard_router
 from app.api.hydrogen_station_api import router as hydrogen_station_router
 from app.api.hydrogen_station_facilities_api import (
     router as hydrogen_station_facilities_router,
@@ -59,6 +60,7 @@ app.include_router(recommendation_history_router)
 app.include_router(charging_log_router)
 app.include_router(user_preference_router)
 app.include_router(recommendation_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/")
