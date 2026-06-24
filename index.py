@@ -11,6 +11,7 @@ from app.api.hydrogen_station_facilities_api import (
     router as hydrogen_station_facilities_router,
 )
 from app.api.hydrogen_station_status_api import router as hydrogen_station_status_router
+from app.api.nearest_recommendation_api import router as nearest_recommendation_router
 from app.api.recommendation_history_api import (
     router as recommendation_history_router,
 )
@@ -61,6 +62,7 @@ app.include_router(charging_log_router)
 app.include_router(user_preference_router)
 app.include_router(recommendation_router)
 app.include_router(weather_router)
+app.include_router(nearest_recommendation_router)
 
 
 @app.get("/")
