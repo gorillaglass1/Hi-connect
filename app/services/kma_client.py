@@ -26,6 +26,9 @@ BASE_TIMES = ["0200", "0500", "0800", "1100", "1400", "1700", "2000", "2300"]
 # 발표 후 API 반영 지연(분)
 API_DELAY_MINUTES = 10
 
+# TODO: 실연동 시 캐싱/throttle에서 사용. 같은 좌표(nx,ny) 재호출 최소 간격.
+CACHE_TTL_MINUTES = 60  # 1시간. 호출 횟수 조절용. 추후 이 값만 바꾸면 됨.
+
 
 def convert_lat_lon_to_grid(lat: float, lon: float) -> tuple[int, int]:
     """위경도 → 기상청 격자좌표(nx, ny). LCC DFS 알고리즘."""

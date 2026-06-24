@@ -27,6 +27,25 @@ class WeatherService:
         self.kma_client = kma_client or KmaClient()
 
     async def get_weather(self, lat: float, lon: float) -> WeatherResponse:
+        # ===== [임시 더미 데이터] 플레오스 화면 개발용 =====
+        # TODO: 기상청 실연동 시 아래 더미 return 블록을 제거하고
+        #       그 아래 실제 KmaClient 호출 로직을 사용할 것.
+        #       값들도 추후 실제 데이터로 대체 필요 (현재는 고정 더미값).
+        # =================================================
+        # 서울시청 기준 테스트값 — 차량 GPS 연동 전까지 임시 고정
+        return WeatherResponse(
+            temperature=21.0,             # 추후 변경 필요 (실제 기온으로 대체)
+            sky="구름많음",                # 추후 변경 필요 (실제 하늘상태로 대체)
+            precipitation_type="없음",     # 추후 변경 필요 (실제 강수형태로 대체)
+            humidity=85,                  # 추후 변경 필요 (실제 습도로 대체)
+            wind_speed=1.0,               # 추후 변경 필요 (실제 풍속으로 대체)
+            feels_like=21.0,              # 추후 변경 필요 (실제 체감온도로 대체)
+            base_time="1400",             # 추후 변경 필요 (실제 발표시각으로 대체)
+            nx=60,                        # 추후 변경 필요 (실제 격자 X좌표로 대체)
+            ny=127,                       # 추후 변경 필요 (실제 격자 Y좌표로 대체)
+        )
+        # ===== [임시 더미 데이터] 끝 — 위 return 블록 제거 시 아래 실연동 복원 =====
+
         result = await self.kma_client.get_vilage_fcst(lat, lon)
         items = result["items"]
 
