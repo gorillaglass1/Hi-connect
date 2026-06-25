@@ -67,15 +67,6 @@ def is_dashboard_ai_enabled() -> bool:
     return get_env_flag("DASHBOARD_AI_ENABLED", default=True)
 
 
-def is_nearest_ai_enabled() -> bool:
-    """가까운 충전소 추천의 ai_insight.message를 Gemini AI로 생성할지 여부.
-    충전소 추천 사유(AI_REASON_ENABLED), 대시보드(DASHBOARD_AI_ENABLED)와
-    독립적인 스위치로, .env의 NEAREST_AI_ENABLED로 제어한다.
-    기본값은 False(규칙 기반 고정 템플릿)이다.
-    """
-    return get_env_flag("NEAREST_AI_ENABLED", default=False)
-
-
 def _is_valid_env_key(key: str) -> bool:
     if not key:
         return False

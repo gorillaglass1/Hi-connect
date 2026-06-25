@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import json
 import os
@@ -6,9 +7,10 @@ import re
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import is_nearest_ai_enabled
+from app.core.config import is_dashboard_ai_enabled
 from app.models.hydrogen_station_status import HydrogenStationStatus
 from app.repositories import hydrogen_station_repo
+from app.services import nearest_recommendation_prompt as prompt_manager
 from app.schemas.nearest_recommendation_schema import (
     NearestRecommendationInsight,
     NearestRecommendationMetric,
@@ -25,11 +27,16 @@ logger = logging.getLogger("nearest_recommendation_service")
 # google-genai 사용 패턴은 recommendation_reason_service 를 그대로 따른다.
 try:
     from google import genai
+    from google.genai import types
     HAS_GENAI = True
 except ImportError:  # pragma: no cover
     HAS_GENAI = False
 
 GEMINI_MODEL = "gemini-2.5-flash"
+
+# Gemini 호출 타임아웃(초). 응답이 느릴 수 있어 여유 있게 설정한다.
+# SDK HTTP 타임아웃(client http_options)과 asyncio 대기 타임아웃에 함께 사용한다.
+GEMINI_TIMEOUT_SECONDS = 60.0
 
 # ===== 임계값/상수 =====
 TANK_CAPACITY_KG = 6.33            # NEXO 기준, 추후 SDK/차종 값으로 교체 예정
@@ -88,8 +95,16 @@ def generate_insight_message(status: str, remaining_range: float) -> str:
     return f"지금 충전이 필요해요. 남은 주행가능거리는 약 {remaining_range}km예요."
 
 
-def _build_metrics(status: str, remaining_range: float) -> list[NearestRecommendationMetric]:
-    """표시용 지표 목록: 주행가능거리 / 권장 충전 시점 / 평균 소모율."""
+def _build_metrics(
+    status: str,
+    remaining_range: float,
+    charge_timing: str | None = None,
+) -> list[NearestRecommendationMetric]:
+    """표시용 지표 목록: 주행가능거리 / 권장 충전 시점 / 평균 소모율.
+
+    charge_timing 이 주어지면(예: Gemini 생성값) 권장 충전 시점에 사용하고,
+    없으면 status별 고정 템플릿(STATUS_CHARGE_TIMING)으로 폴백한다.
+    """
     return [
         NearestRecommendationMetric(
             label="주행가능거리",
@@ -98,7 +113,7 @@ def _build_metrics(status: str, remaining_range: float) -> list[NearestRecommend
         ),
         NearestRecommendationMetric(
             label="권장 충전 시점",
-            value=STATUS_CHARGE_TIMING[status],
+            value=charge_timing or STATUS_CHARGE_TIMING[status],
         ),
         NearestRecommendationMetric(
             label="평균 소모율",
@@ -110,13 +125,20 @@ def _build_metrics(status: str, remaining_range: float) -> list[NearestRecommend
 class NearestRecommendationService:
     def __init__(self, db: AsyncSession):
         self.db = db
-        # ai_insight.message 를 Gemini 로 생성할지 스위치. 기본 False(고정 템플릿).
-        self.ai_enabled = is_nearest_ai_enabled()
+        # ai_insight.message 를 Gemini 로 생성할지 스위치. DASHBOARD_AI_ENABLED 공유(기본 True).
+        self.ai_enabled = is_dashboard_ai_enabled()
         self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         self.client = None
         if self.ai_enabled and HAS_GENAI and self.api_key:
             try:
-                self.client = genai.Client(api_key=self.api_key)
+                # http_options.timeout 은 밀리초 단위. API 응답이 느려도 끊기지 않도록
+                # SDK HTTP 타임아웃도 여유 있게 잡는다.
+                self.client = genai.Client(
+                    api_key=self.api_key,
+                    http_options=types.HttpOptions(
+                        timeout=int(GEMINI_TIMEOUT_SECONDS * 1000)
+                    ),
+                )
             except Exception as e:  # pragma: no cover - defensive
                 logger.error(f"Failed to initialize Gemini Client: {e}")
 
@@ -138,42 +160,62 @@ class NearestRecommendationService:
         status: str,
         remaining_range: float,
         message: str | None = None,
+        charge_timing: str | None = None,
     ) -> NearestRecommendationInsight:
         return NearestRecommendationInsight(
             status=status,
             status_label=STATUS_LABELS[status],
             subtitle=STATUS_SUBTITLES[status],
             message=message or generate_insight_message(status, remaining_range),
-            metrics=_build_metrics(status, remaining_range),
+            metrics=_build_metrics(status, remaining_range, charge_timing),
         )
 
-    def _resolve_insight_message(
+    async def _resolve_ai_insight(
         self,
         status: str,
         remaining_range: float,
         station: NearestRecommendationStation,
-    ) -> str:
-        """확정된 추천 충전소 값으로 ai_insight.message 를 생성한다.
+    ) -> tuple[str, str]:
+        """확정된 추천 충전소 값으로 권장 충전 시점과 ai_insight.message 를 함께 생성한다.
 
-        스위치 off / client 미설정 / 호출 예외 / 파싱 실패 시 기존 고정 템플릿
-        generate_insight_message() 로 폴백한다. (충전소 선택은 하지 않음)
+        반환값은 (권장_충전_시점, message) 튜플이다. 스위치 off / client 미설정 /
+        호출 예외 / 타임아웃 / 파싱 실패 시 기존 고정 템플릿으로 폴백한다.
+        (충전소 선택은 하지 않음)
         """
-        fallback = generate_insight_message(status, remaining_range)
+        fallback_timing = STATUS_CHARGE_TIMING[status]
+        fallback_message = generate_insight_message(status, remaining_range)
 
         if not self.ai_enabled or not self.client:
-            return fallback
+            return fallback_timing, fallback_message
 
+        # SDK 호출은 동기 블로킹이므로 별도 스레드에서 실행하고, 응답이 느려도
+        # 끊기지 않도록 여유 있는 타임아웃(GEMINI_TIMEOUT_SECONDS)을 둔다.
         try:
-            message = self._generate_message_with_gemini(
-                status, remaining_range, station
+            raw_text = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self._call_gemini, status, remaining_range, station
+                ),
+                timeout=GEMINI_TIMEOUT_SECONDS,
             )
+        except asyncio.TimeoutError:
+            logger.warning(
+                f"Gemini insight generation timed out after "
+                f"{GEMINI_TIMEOUT_SECONDS}s, falling back"
+            )
+            return fallback_timing, fallback_message
         except Exception as e:
-            logger.error(f"Gemini message generation failed, falling back: {e}")
-            return fallback
+            logger.error(f"Gemini insight generation failed, falling back: {e}")
+            return fallback_timing, fallback_message
 
-        return message if message else fallback
+        parsed = self._parse_insight(raw_text)
+        if not parsed:
+            return fallback_timing, fallback_message
 
-    def _generate_message_with_gemini(
+        timing = parsed.get("charge_timing") or fallback_timing
+        message = parsed.get("message") or fallback_message
+        return timing, message
+
+    def _call_gemini(
         self,
         status: str,
         remaining_range: float,
@@ -191,47 +233,43 @@ class NearestRecommendationService:
             "운영중": station.is_open,
         }
 
-        prompt = """당신은 수소충전소 추천 서비스의 안내 문구 작성 도우미입니다.
-아래는 규칙이 이미 선택한 추천 충전소의 확정 데이터입니다. 이 데이터를 바탕으로
-사용자에게 보여줄 한 줄 안내 문구(message)를 자연스러운 한국어로 작성하세요.
-
-규칙:
-- 제공된 사실 데이터에 근거해서만 작성하고, 없는 정보를 지어내지 마세요.
-- 충전소를 새로 고르거나 다른 충전소를 언급하지 마세요. 주어진 충전소만 안내합니다.
-- "연료_상태"(sufficient/recommend/urgent)에 맞는 톤으로 안내하세요.
-- 80자 이내로 간결하게 작성하세요.
-
-추천 충전소 데이터(JSON):
-{station_facts_json}
-
-출력 형식:
-- 다른 설명 없이 안내 문구 문자열 한 줄만 출력하세요.
-""".replace(
-            "{station_facts_json}",
-            json.dumps(station_facts, ensure_ascii=False),
-        )
+        # 프롬프트 관리 모듈에서 고정 system instruction + 호출마다 바뀌는 스타일을
+        # 가져와 다양한 문구가 나오도록 한다. (자세한 규칙/스타일은 prompt_manager 참고)
+        user_prompt = prompt_manager.build_user_prompt(station_facts)
 
         response = self.client.models.generate_content(
             model=GEMINI_MODEL,
-            contents=prompt,
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=prompt_manager.SYSTEM_INSTRUCTION,
+                temperature=prompt_manager.GENERATION_TEMPERATURE,
+                response_mime_type="application/json",
+            ),
         )
-        return self._parse_message(response.text)
+        return response.text
 
     @staticmethod
-    def _parse_message(raw_text: str | None) -> str | None:
+    def _parse_insight(raw_text: str | None) -> dict | None:
+        """Gemini 응답에서 charge_timing/message 를 추출한다. 실패 시 None."""
         if not raw_text:
             return None
         cleaned = re.sub(r"```(?:json)?\s*", "", raw_text, flags=re.IGNORECASE)
         cleaned = cleaned.replace("```", "").strip()
-        # 혹시 JSON 문자열("...")로 감싸 오면 풀어서 사용.
-        if len(cleaned) >= 2 and cleaned.startswith('"') and cleaned.endswith('"'):
-            try:
-                unquoted = json.loads(cleaned)
-                if isinstance(unquoted, str):
-                    cleaned = unquoted.strip()
-            except (json.JSONDecodeError, ValueError):
-                pass
-        return cleaned or None
+        try:
+            parsed = json.loads(cleaned)
+        except (json.JSONDecodeError, ValueError):
+            return None
+        if not isinstance(parsed, dict):
+            return None
+
+        result: dict[str, str] = {}
+        timing = parsed.get("charge_timing")
+        if isinstance(timing, str) and timing.strip():
+            result["charge_timing"] = timing.strip()
+        message = parsed.get("message")
+        if isinstance(message, str) and message.strip():
+            result["message"] = message.strip()
+        return result or None
 
     async def get_nearest_cheapest(
         self,
@@ -319,8 +357,8 @@ class NearestRecommendationService:
             lon=cheapest["lon"],
         )
 
-        # 8. ai_insight.message 생성 (Gemini, 실패 시 기존 고정 템플릿 폴백)
-        ai_message = self._resolve_insight_message(
+        # 8. 권장 충전 시점 + ai_insight.message 생성 (Gemini, 실패 시 고정 템플릿 폴백)
+        ai_charge_timing, ai_message = await self._resolve_ai_insight(
             status, remaining_range, recommended_station
         )
 
@@ -332,6 +370,11 @@ class NearestRecommendationService:
                 remaining_range=remaining_range,
                 fuel_type=request.vehicle.fuel_type,
             ),
-            ai_insight=self._build_insight(status, remaining_range, message=ai_message),
+            ai_insight=self._build_insight(
+                status,
+                remaining_range,
+                message=ai_message,
+                charge_timing=ai_charge_timing,
+            ),
             recommended_station=recommended_station,
         )
