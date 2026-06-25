@@ -1,8 +1,12 @@
 import logging
+import json
+import os
+import re
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import is_nearest_ai_enabled
 from app.models.hydrogen_station_status import HydrogenStationStatus
 from app.repositories import hydrogen_station_repo
 from app.schemas.nearest_recommendation_schema import (
@@ -17,6 +21,15 @@ from app.schemas.nearest_recommendation_schema import (
 from app.services.recommendation_service import haversine_distance
 
 logger = logging.getLogger("nearest_recommendation_service")
+
+# google-genai 사용 패턴은 recommendation_reason_service 를 그대로 따른다.
+try:
+    from google import genai
+    HAS_GENAI = True
+except ImportError:  # pragma: no cover
+    HAS_GENAI = False
+
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # ===== 임계값/상수 =====
 TANK_CAPACITY_KG = 6.33            # NEXO 기준, 추후 SDK/차종 값으로 교체 예정
@@ -97,6 +110,15 @@ def _build_metrics(status: str, remaining_range: float) -> list[NearestRecommend
 class NearestRecommendationService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        # ai_insight.message 를 Gemini 로 생성할지 스위치. 기본 False(고정 템플릿).
+        self.ai_enabled = is_nearest_ai_enabled()
+        self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        self.client = None
+        if self.ai_enabled and HAS_GENAI and self.api_key:
+            try:
+                self.client = genai.Client(api_key=self.api_key)
+            except Exception as e:  # pragma: no cover - defensive
+                logger.error(f"Failed to initialize Gemini Client: {e}")
 
     async def _get_latest_status(self, chrstn_mno: str) -> HydrogenStationStatus | None:
         """충전소 최신 상태 1건 (repo 패턴 동일: last_mdfcn_dt desc, status_id desc top1)."""
@@ -124,6 +146,92 @@ class NearestRecommendationService:
             message=message or generate_insight_message(status, remaining_range),
             metrics=_build_metrics(status, remaining_range),
         )
+
+    def _resolve_insight_message(
+        self,
+        status: str,
+        remaining_range: float,
+        station: NearestRecommendationStation,
+    ) -> str:
+        """확정된 추천 충전소 값으로 ai_insight.message 를 생성한다.
+
+        스위치 off / client 미설정 / 호출 예외 / 파싱 실패 시 기존 고정 템플릿
+        generate_insight_message() 로 폴백한다. (충전소 선택은 하지 않음)
+        """
+        fallback = generate_insight_message(status, remaining_range)
+
+        if not self.ai_enabled or not self.client:
+            return fallback
+
+        try:
+            message = self._generate_message_with_gemini(
+                status, remaining_range, station
+            )
+        except Exception as e:
+            logger.error(f"Gemini message generation failed, falling back: {e}")
+            return fallback
+
+        return message if message else fallback
+
+    def _generate_message_with_gemini(
+        self,
+        status: str,
+        remaining_range: float,
+        station: NearestRecommendationStation,
+    ) -> str | None:
+        station_facts = {
+            "연료_상태": status,
+            "주행가능거리_km": remaining_range,
+            "충전소명": station.name,
+            "거리_km": station.distance_km,
+            "판매가격_원_per_kg": station.ntsl_pc,
+            "평균대비_가격차": station.price_diff_from_avg,
+            "예상_충전비용_원": station.estimated_cost,
+            "대기차량_대수": station.wait_vhcle_alge,
+            "운영중": station.is_open,
+        }
+
+        prompt = """당신은 수소충전소 추천 서비스의 안내 문구 작성 도우미입니다.
+아래는 규칙이 이미 선택한 추천 충전소의 확정 데이터입니다. 이 데이터를 바탕으로
+사용자에게 보여줄 한 줄 안내 문구(message)를 자연스러운 한국어로 작성하세요.
+
+규칙:
+- 제공된 사실 데이터에 근거해서만 작성하고, 없는 정보를 지어내지 마세요.
+- 충전소를 새로 고르거나 다른 충전소를 언급하지 마세요. 주어진 충전소만 안내합니다.
+- "연료_상태"(sufficient/recommend/urgent)에 맞는 톤으로 안내하세요.
+- 80자 이내로 간결하게 작성하세요.
+
+추천 충전소 데이터(JSON):
+{station_facts_json}
+
+출력 형식:
+- 다른 설명 없이 안내 문구 문자열 한 줄만 출력하세요.
+""".replace(
+            "{station_facts_json}",
+            json.dumps(station_facts, ensure_ascii=False),
+        )
+
+        response = self.client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+        )
+        return self._parse_message(response.text)
+
+    @staticmethod
+    def _parse_message(raw_text: str | None) -> str | None:
+        if not raw_text:
+            return None
+        cleaned = re.sub(r"```(?:json)?\s*", "", raw_text, flags=re.IGNORECASE)
+        cleaned = cleaned.replace("```", "").strip()
+        # 혹시 JSON 문자열("...")로 감싸 오면 풀어서 사용.
+        if len(cleaned) >= 2 and cleaned.startswith('"') and cleaned.endswith('"'):
+            try:
+                unquoted = json.loads(cleaned)
+                if isinstance(unquoted, str):
+                    cleaned = unquoted.strip()
+            except (json.JSONDecodeError, ValueError):
+                pass
+        return cleaned or None
 
     async def get_nearest_cheapest(
         self,
@@ -211,6 +319,11 @@ class NearestRecommendationService:
             lon=cheapest["lon"],
         )
 
+        # 8. ai_insight.message 생성 (Gemini, 실패 시 기존 고정 템플릿 폴백)
+        ai_message = self._resolve_insight_message(
+            status, remaining_range, recommended_station
+        )
+
         # 9. 응답 조립
         return NearestRecommendationResponse(
             screen=f"battery_{status}",
@@ -219,6 +332,6 @@ class NearestRecommendationService:
                 remaining_range=remaining_range,
                 fuel_type=request.vehicle.fuel_type,
             ),
-            ai_insight=self._build_insight(status, remaining_range),
+            ai_insight=self._build_insight(status, remaining_range, message=ai_message),
             recommended_station=recommended_station,
         )
