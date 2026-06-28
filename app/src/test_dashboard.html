@@ -1279,6 +1279,23 @@
             <div class="map-container">
                 <canvas id="mapCanvas"></canvas>
                 <div id="distanceOverlay" style="position:absolute;top:12px;left:12px;font-size:11px;color:#636366;background:rgba(255,255,255,0.85);padding:4px 10px;border-radius:8px;font-weight:500;"></div>
+
+                <!-- NAV COUNTDOWN PANEL (신규: 경유지 추가 후 5초 카운트다운) -->
+                <div id="navCountdownPanel" style="display:none;position:absolute;top:16px;left:50%;transform:translateX(-50%);align-items:center;gap:14px;background:rgba(28,28,30,0.95);backdrop-filter:blur(20px);color:#fff;border-radius:16px;padding:14px 18px;box-shadow:0 8px 30px rgba(0,0,0,0.25);z-index:30;">
+                    <div>
+                        <div style="font-size:11px;color:#aeaeb2;font-weight:500;">경유지 경로 안내</div>
+                        <div id="navCountdownStation" style="font-size:14px;font-weight:700;margin-top:2px;">-</div>
+                    </div>
+                    <button onclick="startNavigation()" style="display:flex;align-items:center;gap:8px;background:#007aff;color:#fff;border:none;border-radius:18px;padding:8px 16px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">
+                        <span id="navCountdownNum" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,0.2);font-size:12px;">5</span>
+                        안내 시작
+                    </button>
+                </div>
+
+                <!-- NAV ACTIVE BANNER (신규: 안내 중 배너) -->
+                <div id="navBanner" style="display:none;position:absolute;bottom:80px;left:16px;background:rgba(0,122,255,0.95);color:#fff;border-radius:12px;padding:8px 14px;font-size:13px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.18);z-index:30;">
+                    <i class="fa-solid fa-route"></i> <span id="navBannerText">안내 중</span>
+                </div>
             </div>
 
             <div class="map-search-bar">
@@ -1440,10 +1457,46 @@
         </div>
     </div>
 
+    <!-- WAYPOINT CONFIRM MODAL (신규: 경유지 추가 확인 팝업, 기존 설정 모달과 별도) -->
+    <div class="settings-overlay" id="waypointOverlay" onclick="if(event.target===this)closeWaypointModal()">
+        <div class="settings-sheet" style="width:420px;">
+            <div class="settings-section-title" style="margin-bottom:6px;">경유지 추가</div>
+            <h2 style="font-size:18px;font-weight:700;margin-bottom:18px;">현재 경로에 이 충전소를 경유지로 추가할까요?</h2>
+
+            <div class="station-rec-card" style="margin-bottom:20px;">
+                <div class="rec-station-row">
+                    <div class="rec-pin"><i class="fa-solid fa-location-dot"></i></div>
+                    <div class="rec-station-info">
+                        <div class="rec-station-name" id="wpStationName">-</div>
+                        <div class="rec-station-meta" id="wpStationAddr">-</div>
+                        <div class="rec-station-details" id="wpStationMeta">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;">
+                <button class="settings-btn settings-btn-secondary" style="margin-top:0;" onclick="closeWaypointModal()">
+                    취소
+                </button>
+                <button class="settings-btn settings-btn-primary" style="margin-top:0;" onclick="confirmWaypoint()">
+                    <i class="fa-solid fa-location-dot"></i> 경유지 추가
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ===== GLOBALS =====
         let stationsList = [];
         let allStations = [];
+        // 신규: [경유지 추가] 확정 시 선택된 충전소를 저장 (이후 지도 경로 표시 단계로 이어질 자리)
+        let selectedWaypointStation = null;
+        // 신규: 확인 팝업이 떠 있는 동안 보류 중인 충전소 chrstn_mno
+        let pendingWaypointMno = null;
+        // 신규: 경로 안내(내비) 상태 플래그 — drawMap()이 true일 때 경로선을 덧그림
+        let navigationActive = false;
+        // 신규: 5초 카운트다운 setInterval 핸들 (버튼 클릭/자동 시작 시 clearInterval로 중단)
+        let countdownTimer = null;
         const DASHBOARD_AUTO_ALPHA_RATIO = 0.6;
         const userPresets = {
             1: { weight_price: 2.2, weight_waiting_time: 1.5, weight_distance: 1.0, weight_facilities: 0.5, safety_margin: 1.1 },
@@ -1851,10 +1904,28 @@
 
             drawLabel("현재 위치", curPt.x, curPt.y - 18);
             drawLabel("목적지", destPt.x, destPt.y - 16);
+
+            // 신규: 안내 중일 때만 경유지 경로를 덧그린다 (resize 등 재호출 후에도 유지).
+            // toCanvas/curPt/destPt를 그대로 넘겨 좌표 변환을 drawMap과 일치시킴.
+            if (navigationActive && selectedWaypointStation) {
+                drawNavigationRoute(ctx, toCanvas, curPt, destPt);
+            }
         }
 
         // ===== FETCH RECOMMENDATIONS =====
         async function fetchRecommendations() {
+            // 신규: 새 추천 검색 시작 시 이전 경유지 경로 안내 상태를 초기화한다.
+            // navigationActive=false + 패널/배너 숨김 + 타이머 정지 + 선택 충전소 null →
+            // 이어지는 drawMap()에서 이전 경로선이 그려지지 않음.
+            navigationActive = false;
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+            const navPanelEl = document.getElementById("navCountdownPanel");
+            if (navPanelEl) navPanelEl.style.display = "none";
+            const navBannerEl = document.getElementById("navBanner");
+            if (navBannerEl) navBannerEl.style.display = "none";
+            selectedWaypointStation = null;
+            drawMap();  // 캔버스를 즉시 다시 그려 이전 경로선을 화면에서 제거 (없으면 다음 drawMap까지 남음)
+
             const userId = document.getElementById("userSelector").value;
             const curLat = parseFloat(document.getElementById("curLat").value);
             const curLon = parseFloat(document.getElementById("curLon").value);
@@ -1893,7 +1964,11 @@
             };
 
             try {
-                const res = await fetch("/recommendations/personalized/delivery-payloads", {
+                // 기존: camelCase 응답(HydrogenStationCard)이라 renderStationList의 snake_case 필드와
+                // 불일치하여 카드가 전부 undefined로 렌더됨. snake_case 응답(RecommendedStationResponse)을
+                // 주는 /recommendations/personalized 로 변경.
+                // const res = await fetch("/recommendations/personalized/delivery-payloads", {
+                const res = await fetch("/recommendations/personalized", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
@@ -1944,6 +2019,8 @@
                     ? `대기 ${vp.wait_vehicles}대 · ${vp.wait_time_minutes}분`
                     : "대기 없음";
 
+                // 변경: 카드 상세줄의 "700bar 사용 가능"은 하드코딩이었음 →
+                // 응답의 delivery_payload.pressure_info("700bar 사용 가능"/"700bar 사용 불가") 값 사용.
                 const card = `
                     <div class="station-rec-card">
                         <div class="rec-station-row">
@@ -1956,7 +2033,7 @@
                                     ${vp.road_nm_addr || "주소 정보 없음"}
                                 </div>
                                 <div class="rec-station-details">
-                                    OPEN · ${vp.ntsl_pc ? vp.ntsl_pc.toLocaleString()+'원/kg' : '가격정보 없음'} · 700bar 사용 가능
+                                    OPEN · ${vp.ntsl_pc ? vp.ntsl_pc.toLocaleString()+'원/kg' : '가격정보 없음'} · ${vp.delivery_payload ? vp.delivery_payload.pressure_info : '700bar 정보 없음'}
                                 </div>
                             </div>
                         </div>
@@ -1977,8 +2054,143 @@
             document.getElementById("moreLink").style.display = "block";
 
             document.querySelectorAll(".btn-route").forEach(btn => {
-                btn.addEventListener("click", () => pushWaypoint(btn.dataset.chrstnMno));
+                // 기존: 클릭 즉시 학습 호출. 신규: 먼저 확인 팝업을 띄우고, 실제 학습은 팝업의 [경유지 추가] 버튼으로 이동.
+                // btn.addEventListener("click", () => pushWaypoint(btn.dataset.chrstnMno));
+                btn.addEventListener("click", () => openWaypointModal(btn.dataset.chrstnMno));
             });
+        }
+
+        // ===== WAYPOINT CONFIRM MODAL (신규) =====
+        // btn-route 클릭 시 호출: 학습 API를 바로 부르지 않고 확인 팝업을 띄운다.
+        function openWaypointModal(chrstnMno) {
+            const station = stationsList.find(st => st.chrstn_mno === chrstnMno);
+            if (!station) {
+                logTerminal("선택한 충전소를 찾을 수 없습니다.", "warning");
+                return;
+            }
+            pendingWaypointMno = chrstnMno;
+
+            document.getElementById("wpStationName").textContent = station.chrstn_nm;
+            document.getElementById("wpStationAddr").textContent = station.road_nm_addr || "주소 정보 없음";
+            const pressure = station.delivery_payload ? station.delivery_payload.pressure_info : "700bar 정보 없음";
+            document.getElementById("wpStationMeta").textContent =
+                `${station.distance_to_station}km · 대기 ${station.wait_time_minutes}분 · ${pressure}`;
+
+            document.getElementById("waypointOverlay").classList.add("open");
+        }
+
+        // [취소] 또는 배경 클릭: 팝업만 닫고 아무 동작 안 함.
+        function closeWaypointModal() {
+            document.getElementById("waypointOverlay").classList.remove("open");
+            pendingWaypointMno = null;
+        }
+
+        // [경유지 추가]: 선택 충전소를 전역에 저장하고 팝업을 닫은 뒤 기존 학습 로직을 실행.
+        function confirmWaypoint() {
+            const chrstnMno = pendingWaypointMno;
+            if (!chrstnMno) { closeWaypointModal(); return; }
+            // 지도 경로 표시 단계로 이어질 자리: 선택된 충전소 정보를 전역 변수에 저장.
+            selectedWaypointStation = stationsList.find(st => st.chrstn_mno === chrstnMno) || null;
+            closeWaypointModal();
+            pushWaypoint(chrstnMno);   // 기존 가중치 학습 호출 그대로 실행
+            startWaypointCountdown();  // 신규: 학습 후 5초 카운트다운 패널 표시 → 0이면 자동 안내 시작
+        }
+
+        // ===== COUNTDOWN → NAVIGATION (신규) =====
+        // 경유 충전소 좌표 추출: delivery_payload.latitude/longitude 우선, 없으면 다른 위경도 필드 폴백.
+        function getWaypointLatLon(station) {
+            if (!station) return null;
+            const dp = station.delivery_payload || {};
+            const lat = dp.latitude ?? station.latitude ?? station.let ?? station.lat;
+            const lon = dp.longitude ?? station.longitude ?? station.lon;
+            if (lat == null || lon == null) return null;
+            return { lat: parseFloat(lat), lon: parseFloat(lon) };
+        }
+
+        // 5초 카운트다운 시작: 0이 되면 자동으로 startNavigation() 호출.
+        function startWaypointCountdown() {
+            if (!selectedWaypointStation) return;
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+
+            document.getElementById("navCountdownStation").textContent =
+                selectedWaypointStation.chrstn_nm || "선택한 충전소";
+
+            let remaining = 5;
+            const numEl = document.getElementById("navCountdownNum");
+            numEl.textContent = remaining;
+
+            document.getElementById("navBanner").style.display = "none";
+            document.getElementById("navCountdownPanel").style.display = "flex";
+
+            countdownTimer = setInterval(() => {
+                remaining -= 1;
+                if (remaining <= 0) {
+                    startNavigation();   // 0이 되면 자동 시작
+                    return;
+                }
+                numEl.textContent = remaining;
+            }, 1000);
+
+            logTerminal(`${selectedWaypointStation.chrstn_nm} 경유 안내 5초 후 시작...`);
+        }
+
+        // 안내 시작: 카운트다운 정지 → 패널 닫고 → 안내 상태 on → 지도에 경로선 덧그림 + 배너.
+        function startNavigation() {
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+            document.getElementById("navCountdownPanel").style.display = "none";
+
+            navigationActive = true;
+
+            const stationName = selectedWaypointStation ? (selectedWaypointStation.chrstn_nm || "충전소") : "충전소";
+            document.getElementById("navBannerText").textContent = "안내 중 · " + stationName + " 경유";
+            document.getElementById("navBanner").style.display = "block";
+
+            drawMap();   // navigationActive=true 이므로 drawMap 끝에서 경로선이 덧그려짐
+            logTerminal("경유지 경로 안내를 시작합니다.", "success");
+        }
+
+        // drawMap() 내부에서만 호출. 현재위치 → 경유 충전소 → 목적지를 파란 실선으로 잇고 강조 마커 표시.
+        function drawNavigationRoute(ctx, toCanvas, curPt, destPt) {
+            const wp = getWaypointLatLon(selectedWaypointStation);
+            if (!wp) return;
+            const wpPt = toCanvas(wp.lat, wp.lon);
+
+            // 경로선 (파란 실선)
+            ctx.beginPath();
+            ctx.moveTo(curPt.x, curPt.y);
+            ctx.lineTo(wpPt.x, wpPt.y);
+            ctx.lineTo(destPt.x, destPt.y);
+            ctx.strokeStyle = "#007aff";
+            ctx.lineWidth = 4;
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+            ctx.setLineDash([]);
+            ctx.stroke();
+
+            // 경유 충전소 강조 마커
+            ctx.beginPath();
+            ctx.arc(wpPt.x, wpPt.y, 11, 0, 2*Math.PI);
+            ctx.fillStyle = "#007aff";
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(wpPt.x, wpPt.y, 4, 0, 2*Math.PI);
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+
+            // 경유지 라벨
+            const label = "경유 · " + (selectedWaypointStation.chrstn_nm || "충전소");
+            ctx.font = "bold 11px 'Pretendard', sans-serif";
+            const metrics = ctx.measureText(label);
+            const tw = metrics.width + 12;
+            ctx.fillStyle = "rgba(0,122,255,0.95)";
+            ctx.beginPath();
+            ctx.roundRect(wpPt.x - tw/2, wpPt.y - 30, tw, 18, 5);
+            ctx.fill();
+            ctx.fillStyle = "#fff";
+            ctx.fillText(label, wpPt.x - metrics.width/2, wpPt.y - 17);
         }
 
         // ===== PUSH WAYPOINT (LEARNING) =====
