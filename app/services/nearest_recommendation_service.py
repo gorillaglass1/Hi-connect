@@ -1,17 +1,17 @@
 import asyncio
-import logging
 import json
+import logging
 import os
 import re
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import is_dashboard_ai_enabled
 from app.models.hydrogen_station_status import HydrogenStationStatus
 from app.repositories import hydrogen_station_repo
-from app.services import nearest_recommendation_prompt as prompt_manager
 from app.schemas.nearest_recommendation_schema import (
+    DrivingHabit,
     NearestRecommendationInsight,
     NearestRecommendationMetric,
     NearestRecommendationRequest,
@@ -19,56 +19,38 @@ from app.schemas.nearest_recommendation_schema import (
     NearestRecommendationStation,
     NearestRecommendationVehicleResponse,
 )
-# 거리 계산은 기존 추천 로직의 haversine_distance를 재사용 (새로 만들지 않음)
+from app.services import nearest_recommendation_prompt as prompt_manager
 from app.services.recommendation_service import haversine_distance
+from app.services.sql_guard import UnsafeSqlError, validate_station_sql
 
 logger = logging.getLogger("nearest_recommendation_service")
 
-# google-genai 사용 패턴은 recommendation_reason_service 를 그대로 따른다.
 try:
     from google import genai
     from google.genai import types
     HAS_GENAI = True
-except ImportError:  # pragma: no cover
+except ImportError:
     HAS_GENAI = False
 
 GEMINI_MODEL = "gemini-2.5-flash"
-
-# Gemini 호출 타임아웃(초). 응답이 느릴 수 있어 여유 있게 설정한다.
-# SDK HTTP 타임아웃(client http_options)과 asyncio 대기 타임아웃에 함께 사용한다.
 GEMINI_TIMEOUT_SECONDS = 60.0
+TANK_CAPACITY_KG = 6.33
+FUEL_SUFFICIENT_THRESHOLD = 50
+FUEL_RECOMMEND_THRESHOLD = 25
+HIGH_EVENTS_PER_HOUR = 2.0  # 이상이면 소모율 "다소 높음" 판정
+AVG_CITY_SPEED_KMH = 25.0   # eta_minutes 근사용 도심 평균 속도
+AVAILABLE_WAIT_LIMIT = 5    # 대기 차량 이 값 미만이면 available=True
 
-# ===== 임계값/상수 =====
-TANK_CAPACITY_KG = 6.33            # NEXO 기준, 추후 SDK/차종 값으로 교체 예정
-FUEL_SUFFICIENT_THRESHOLD = 50     # 이상이면 sufficient
-FUEL_RECOMMEND_THRESHOLD = 25      # 이상이면 recommend, 미만은 urgent
-
-# status별 한글 라벨 / 부제목 / 권장 충전 시점 문구 (추후 LLM 교체 시 참고용 고정 템플릿)
-STATUS_LABELS = {
-    "sufficient": "충분",
-    "recommend": "충전 권장",
-    "urgent": "긴급",
+# status -> (라벨, 부제목, 폴백 충전 시점)
+_FALLBACK_LABELS = {
+    "sufficient": ("충분", "잔량 충분", "여유 있음"),
+    "recommend": ("충전 권장", "충전 권장 구간", "곧 충전 권장"),
+    "urgent": ("긴급", "긴급 충전 필요", "즉시 충전"),
 }
-STATUS_SUBTITLES = {
-    "sufficient": "잔량 충분",
-    "recommend": "충전 권장 구간",
-    "urgent": "긴급 충전 필요",
-}
-STATUS_CHARGE_TIMING = {
-    "sufficient": "여유 있음",
-    "recommend": "곧 충전 권장",
-    "urgent": "즉시 충전",
-}
-
-# 평균 소모율 지표 표시값 (추후 실데이터 연동 시 교체 예정, 현재는 고정값)
-AVERAGE_CONSUMPTION_LABEL = "정상"
-
-# radius 내 가격 있는 충전소가 0개일 때 안내 메시지
 NO_STATION_MESSAGE = "근처에 충전소 정보가 없어요. 잠시 후 다시 시도해 주세요."
 
 
 def determine_status(fuel_percent: int) -> str:
-    """연료 잔량(%) 기준 규칙 판정 (LLM 미사용)."""
     if fuel_percent >= FUEL_SUFFICIENT_THRESHOLD:
         return "sufficient"
     if fuel_percent >= FUEL_RECOMMEND_THRESHOLD:
@@ -76,167 +58,113 @@ def determine_status(fuel_percent: int) -> str:
     return "urgent"
 
 
-def calculate_charge_amount(fuel_percent: int) -> float:
-    """가득 채우기까지 필요한 충전량(kg)."""
-    return TANK_CAPACITY_KG * (1 - fuel_percent / 100)
+def _estimated_cost(fuel_percent: int, price: int | None) -> int:
+    if not price:
+        return 0
+    return round(TANK_CAPACITY_KG * (1 - fuel_percent / 100) * price)
 
 
-def calculate_estimated_cost(fuel_percent: int, price: int) -> int:
-    """예상 충전 비용(원) = 충전량(kg) * 판매가(원/kg)."""
-    return round(calculate_charge_amount(fuel_percent) * price)
+def _consumption_from_habit(habit: DrivingHabit | None) -> tuple[str, str]:
+    """운전습관 기반 (소모율 표시값, tone)."""
+    if habit is None or habit.style == "unknown":
+        return "정상", "neutral"
+    if habit.style == "aggressive" or habit.events_per_hour >= HIGH_EVENTS_PER_HOUR:
+        return "다소 높음", "warning"
+    if habit.style == "calm":
+        return "낮음", "positive"
+    return "정상", "neutral"
 
 
-def generate_insight_message(status: str, remaining_range: float) -> str:
-    """status별 고정 템플릿 인사이트 메시지 (추후 LLM 교체 예정)."""
-    if status == "sufficient":
-        return f"잔량이 넉넉해요. 약 {remaining_range}km 더 주행할 수 있어요."
-    if status == "recommend":
-        return f"슬슬 충전을 준비하세요. 약 {remaining_range}km 주행 가능해요."
-    return f"지금 충전이 필요해요. 남은 주행가능거리는 약 {remaining_range}km예요."
+def _fallback_message(status: str, remaining_range: float) -> str:
+    return {
+        "sufficient": f"잔량이 넉넉해요. 약 {remaining_range}km 더 주행할 수 있어요.",
+        "recommend": f"슬슬 충전을 준비하세요. 약 {remaining_range}km 주행 가능해요.",
+        "urgent": f"지금 충전이 필요해요. 남은 주행가능거리는 약 {remaining_range}km예요.",
+    }[status]
 
 
-def _build_metrics(
-    status: str,
-    remaining_range: float,
-    charge_timing: str | None = None,
+def _eta_minutes(distance_km: float) -> int:
+    """경로 API 미연동 시 거리 기반 근사 (도심 평균 속도 가정)."""
+    if not distance_km:
+        return 0
+    return round(distance_km / AVG_CITY_SPEED_KMH * 60)
+
+
+def _station_badge(ntsl_pc: int | None, min_price: float | None, wait: int | None) -> str | None:
+    """근거가 있을 때만 강조 칩을 부여한다."""
+    if ntsl_pc is not None and min_price is not None and ntsl_pc <= min_price:
+        return "근처 최저가"
+    if wait == 0:
+        return "대기 없음"
+    return None
+
+
+def _metrics(
+    remaining_range: float, timing: str, consumption: str, tone: str
 ) -> list[NearestRecommendationMetric]:
-    """표시용 지표 목록: 주행가능거리 / 권장 충전 시점 / 평균 소모율.
-
-    charge_timing 이 주어지면(예: Gemini 생성값) 권장 충전 시점에 사용하고,
-    없으면 status별 고정 템플릿(STATUS_CHARGE_TIMING)으로 폴백한다.
-    """
     return [
-        NearestRecommendationMetric(
-            label="주행가능거리",
-            value=str(remaining_range),
-            unit="km",
-        ),
-        NearestRecommendationMetric(
-            label="권장 충전 시점",
-            value=charge_timing or STATUS_CHARGE_TIMING[status],
-        ),
-        NearestRecommendationMetric(
-            label="평균 소모율",
-            value=AVERAGE_CONSUMPTION_LABEL,
-        ),
+        NearestRecommendationMetric(label="주행가능거리", value=str(remaining_range), unit="km"),
+        NearestRecommendationMetric(label="권장 충전 시점", value=timing),
+        NearestRecommendationMetric(label="예상 소모율", value=consumption, tone=tone),
     ]
 
 
 class NearestRecommendationService:
     def __init__(self, db: AsyncSession):
         self.db = db
-        # ai_insight.message 를 Gemini 로 생성할지 스위치. DASHBOARD_AI_ENABLED 공유(기본 True).
         self.ai_enabled = is_dashboard_ai_enabled()
         self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         self.client = None
         if self.ai_enabled and HAS_GENAI and self.api_key:
             try:
-                # http_options.timeout 은 밀리초 단위. API 응답이 느려도 끊기지 않도록
-                # SDK HTTP 타임아웃도 여유 있게 잡는다.
                 self.client = genai.Client(
                     api_key=self.api_key,
                     http_options=types.HttpOptions(
                         timeout=int(GEMINI_TIMEOUT_SECONDS * 1000)
                     ),
                 )
-            except Exception as e:  # pragma: no cover - defensive
-                logger.error(f"Failed to initialize Gemini Client: {e}")
+            except Exception as e:
+                logger.error(f"Gemini 클라이언트 초기화 실패: {e}")
 
-    async def _get_latest_status(self, chrstn_mno: str) -> HydrogenStationStatus | None:
-        """충전소 최신 상태 1건 (repo 패턴 동일: last_mdfcn_dt desc, status_id desc top1)."""
-        result = await self.db.execute(
-            select(HydrogenStationStatus)
-            .where(HydrogenStationStatus.chrstn_mno == chrstn_mno)
-            .order_by(
-                HydrogenStationStatus.last_mdfcn_dt.desc().nullslast(),
-                HydrogenStationStatus.status_id.desc(),
-            )
-            .limit(1)
-        )
-        return result.scalar_one_or_none()
+    # ===== Gemini 단일 호출 (SQL + insight) =====
 
-    def _build_insight(
+    async def _call_gemini_combined(
         self,
         status: str,
+        fuel_percent: int,
         remaining_range: float,
-        message: str | None = None,
-        charge_timing: str | None = None,
-    ) -> NearestRecommendationInsight:
-        return NearestRecommendationInsight(
+        lat: float,
+        lon: float,
+        radius_km: float,
+        driving_habit: DrivingHabit | None,
+    ) -> dict | None:
+        """SQL + insight를 단일 Gemini 호출로 생성한다. 실패 시 None."""
+        if not self.client:
+            return None
+
+        user_prompt = prompt_manager.build_prompt(
             status=status,
-            status_label=STATUS_LABELS[status],
-            subtitle=STATUS_SUBTITLES[status],
-            message=message or generate_insight_message(status, remaining_range),
-            metrics=_build_metrics(status, remaining_range, charge_timing),
+            fuel_percent=fuel_percent,
+            remaining_range=remaining_range,
+            lat=lat,
+            lon=lon,
+            radius_km=radius_km,
+            driving_habit=driving_habit,
         )
-
-    async def _resolve_ai_insight(
-        self,
-        status: str,
-        remaining_range: float,
-        station: NearestRecommendationStation,
-    ) -> tuple[str, str]:
-        """확정된 추천 충전소 값으로 권장 충전 시점과 ai_insight.message 를 함께 생성한다.
-
-        반환값은 (권장_충전_시점, message) 튜플이다. 스위치 off / client 미설정 /
-        호출 예외 / 타임아웃 / 파싱 실패 시 기존 고정 템플릿으로 폴백한다.
-        (충전소 선택은 하지 않음)
-        """
-        fallback_timing = STATUS_CHARGE_TIMING[status]
-        fallback_message = generate_insight_message(status, remaining_range)
-
-        if not self.ai_enabled or not self.client:
-            return fallback_timing, fallback_message
-
-        # SDK 호출은 동기 블로킹이므로 별도 스레드에서 실행하고, 응답이 느려도
-        # 끊기지 않도록 여유 있는 타임아웃(GEMINI_TIMEOUT_SECONDS)을 둔다.
         try:
             raw_text = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self._call_gemini, status, remaining_range, station
-                ),
+                asyncio.to_thread(self._gemini_generate, user_prompt),
                 timeout=GEMINI_TIMEOUT_SECONDS,
             )
         except asyncio.TimeoutError:
-            logger.warning(
-                f"Gemini insight generation timed out after "
-                f"{GEMINI_TIMEOUT_SECONDS}s, falling back"
-            )
-            return fallback_timing, fallback_message
+            logger.warning(f"Gemini 타임아웃 ({GEMINI_TIMEOUT_SECONDS}s)")
+            return None
         except Exception as e:
-            logger.error(f"Gemini insight generation failed, falling back: {e}")
-            return fallback_timing, fallback_message
+            logger.error(f"Gemini 호출 실패: {e}")
+            return None
+        return self._parse_combined(raw_text)
 
-        parsed = self._parse_insight(raw_text)
-        if not parsed:
-            return fallback_timing, fallback_message
-
-        timing = parsed.get("charge_timing") or fallback_timing
-        message = parsed.get("message") or fallback_message
-        return timing, message
-
-    def _call_gemini(
-        self,
-        status: str,
-        remaining_range: float,
-        station: NearestRecommendationStation,
-    ) -> str | None:
-        station_facts = {
-            "연료_상태": status,
-            "주행가능거리_km": remaining_range,
-            "충전소명": station.name,
-            "거리_km": station.distance_km,
-            "판매가격_원_per_kg": station.ntsl_pc,
-            "평균대비_가격차": station.price_diff_from_avg,
-            "예상_충전비용_원": station.estimated_cost,
-            "대기차량_대수": station.wait_vhcle_alge,
-            "운영중": station.is_open,
-        }
-
-        # 프롬프트 관리 모듈에서 고정 system instruction + 호출마다 바뀌는 스타일을
-        # 가져와 다양한 문구가 나오도록 한다. (자세한 규칙/스타일은 prompt_manager 참고)
-        user_prompt = prompt_manager.build_user_prompt(station_facts)
-
+    def _gemini_generate(self, user_prompt: str) -> str | None:
         response = self.client.models.generate_content(
             model=GEMINI_MODEL,
             contents=user_prompt,
@@ -249,8 +177,8 @@ class NearestRecommendationService:
         return response.text
 
     @staticmethod
-    def _parse_insight(raw_text: str | None) -> dict | None:
-        """Gemini 응답에서 charge_timing/message 를 추출한다. 실패 시 None."""
+    def _parse_combined(raw_text: str | None) -> dict | None:
+        """Gemini 응답 JSON을 파싱한다. 실패 시 None."""
         if not raw_text:
             return None
         cleaned = re.sub(r"```(?:json)?\s*", "", raw_text, flags=re.IGNORECASE)
@@ -259,17 +187,187 @@ class NearestRecommendationService:
             parsed = json.loads(cleaned)
         except (json.JSONDecodeError, ValueError):
             return None
-        if not isinstance(parsed, dict):
+        return parsed if isinstance(parsed, dict) else None
+
+    # ===== 충전소 조회 =====
+
+    async def _load_priced_candidates(
+        self, lat: float, lon: float, radius_km: float
+    ) -> tuple[list[tuple[float, object]], float | None, float | None]:
+        """반경 내 가격 있는 후보 목록과 (평균가, 최저가)를 한 번의 조회로 반환한다."""
+        stations = await hydrogen_station_repo.get_active_hydrogen_stations_for_recommendation(
+            self.db
+        )
+        candidates = []
+        for st in stations:
+            if st.let is None or st.lon is None or st.ntsl_pc is None:
+                continue
+            dist = haversine_distance(lat, lon, float(st.let), float(st.lon))
+            if dist <= radius_km:
+                candidates.append((dist, st))
+        prices = [c[1].ntsl_pc for c in candidates]
+        avg_price = sum(prices) / len(prices) if prices else None
+        min_price = min(prices) if prices else None
+        return candidates, avg_price, min_price
+
+    def _make_station(
+        self,
+        *,
+        chrstn_mno: str,
+        name: str,
+        road: str | None,
+        dist: float,
+        ntsl_pc: int | None,
+        is_open: bool,
+        wait: int | None,
+        lat_: float,
+        lon_: float,
+        avg_price: float | None,
+        min_price: float | None,
+        realtime: bool,
+        fuel_percent: int,
+    ) -> NearestRecommendationStation:
+        price_diff = (
+            round(ntsl_pc - avg_price, 1) if avg_price is not None and ntsl_pc else 0.0
+        )
+        return NearestRecommendationStation(
+            chrstn_mno=chrstn_mno,
+            name=name,
+            road_nm_addr=road,
+            distance_km=round(dist, 2),
+            ntsl_pc=ntsl_pc,
+            price_diff_from_avg=price_diff,
+            estimated_cost=_estimated_cost(fuel_percent, ntsl_pc),
+            wait_vhcle_alge=wait,
+            is_open=is_open,
+            let=float(lat_),
+            lon=float(lon_),
+            badge=_station_badge(ntsl_pc, min_price, wait),
+            realtime_price=realtime,
+            eta_minutes=_eta_minutes(dist),
+            available=is_open and (wait or 0) < AVAILABLE_WAIT_LIMIT,
+        )
+
+    async def _fetch_station_by_sql(
+        self,
+        raw_sql: str,
+        lat: float,
+        lon: float,
+        radius_km: float,
+        fuel_percent: int,
+        avg_price: float | None,
+        min_price: float | None,
+    ) -> NearestRecommendationStation | None:
+        """Gemini가 생성한 SQL로 최적(최저가) 충전소 1곳을 찾는다. 실패 시 None."""
+        try:
+            safe_sql = validate_station_sql(raw_sql)
+            rows = (await self.db.execute(text(safe_sql))).mappings().all()
+        except UnsafeSqlError as e:
+            logger.warning(f"SQL 검증 실패 (Python 폴백): {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"SQL 실행 실패 (Python 폴백): {e}")
             return None
 
-        result: dict[str, str] = {}
-        timing = parsed.get("charge_timing")
-        if isinstance(timing, str) and timing.strip():
-            result["charge_timing"] = timing.strip()
-        message = parsed.get("message")
-        if isinstance(message, str) and message.strip():
-            result["message"] = message.strip()
-        return result or None
+        candidates = []
+        for row in rows:
+            if row.get("let") is None or row.get("lon") is None:
+                continue
+            dist = haversine_distance(lat, lon, float(row["let"]), float(row["lon"]))
+            if dist <= radius_km:
+                candidates.append((dist, row))
+        if not candidates:
+            return None
+
+        dist, row = min(candidates, key=lambda x: (x[1].get("ntsl_pc") or 9_999_999, x[0]))
+        return self._make_station(
+            chrstn_mno=row["chrstn_mno"],
+            name=row["chrstn_nm"],
+            road=row.get("road_nm_addr") or row.get("lotno_addr"),
+            dist=dist,
+            ntsl_pc=row.get("ntsl_pc"),
+            is_open=row.get("oper_yn") == "Y",
+            wait=row.get("wait_vhcle_alge"),
+            lat_=row["let"],
+            lon_=row["lon"],
+            avg_price=avg_price,
+            min_price=min_price,
+            realtime=row.get("rltm_info_yn") == "Y",
+            fuel_percent=fuel_percent,
+        )
+
+    async def _fetch_station_by_python(
+        self,
+        candidates: list[tuple[float, object]],
+        avg_price: float | None,
+        min_price: float | None,
+        fuel_percent: int,
+    ) -> NearestRecommendationStation | None:
+        """Python 폴백: 후보 중 최저가 1곳 선택 (candidates는 _load_priced_candidates 결과)."""
+        if not candidates:
+            return None
+
+        dist, st = min(candidates, key=lambda x: (x[1].ntsl_pc, x[0]))
+        latest = (
+            await self.db.execute(
+                select(HydrogenStationStatus)
+                .where(HydrogenStationStatus.chrstn_mno == st.chrstn_mno)
+                .order_by(
+                    HydrogenStationStatus.last_mdfcn_dt.desc().nullslast(),
+                    HydrogenStationStatus.status_id.desc(),
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
+        return self._make_station(
+            chrstn_mno=st.chrstn_mno,
+            name=st.chrstn_nm,
+            road=st.road_nm_addr or st.lotno_addr,
+            dist=dist,
+            ntsl_pc=st.ntsl_pc,
+            is_open=st.oper_yn == "Y",
+            wait=latest.wait_vhcle_alge if latest else None,
+            lat_=st.let,
+            lon_=st.lon,
+            avg_price=avg_price,
+            min_price=min_price,
+            realtime=st.rltm_info_yn == "Y",
+            fuel_percent=fuel_percent,
+        )
+
+    # ===== Insight 조립 =====
+
+    def _build_insight(
+        self,
+        status: str,
+        remaining_range: float,
+        gemini: dict | None,
+        driving_habit: DrivingHabit | None,
+        no_station: bool = False,
+    ) -> NearestRecommendationInsight:
+        label, subtitle, fallback_timing = _FALLBACK_LABELS[status]
+        g = gemini or {}
+        habit_consumption, habit_tone = _consumption_from_habit(driving_habit)
+        message = (
+            NO_STATION_MESSAGE
+            if no_station
+            else g.get("message") or _fallback_message(status, remaining_range)
+        )
+        return NearestRecommendationInsight(
+            status=status,
+            status_label=g.get("status_label") or label,
+            subtitle=g.get("subtitle") or subtitle,
+            message=message,
+            metrics=_metrics(
+                remaining_range,
+                g.get("charge_timing") or fallback_timing,
+                g.get("consumption_value") or habit_consumption,
+                g.get("consumption_tone") or habit_tone,
+            ),
+        )
+
+    # ===== 메인 엔트리 =====
 
     async def get_nearest_cheapest(
         self,
@@ -277,92 +375,40 @@ class NearestRecommendationService:
     ) -> NearestRecommendationResponse:
         fuel_percent = request.vehicle.fuel_percent
         remaining_range = request.vehicle.remaining_range
-        cur_lat = request.location.let
-        cur_lon = request.location.lon
+        lat = request.location.let
+        lon = request.location.lon
         radius_km = request.context.radius_km if request.context else 10.0
-
+        driving_habit = request.driving_habit
         status = determine_status(fuel_percent)
 
-        # 1. 활성 충전소 조회 (oper_yn='Y' AND del_at='0') — 기존 repo 재사용
-        stations = (
-            await hydrogen_station_repo.get_active_hydrogen_stations_for_recommendation(
-                self.db
-            )
-        )
-
-        # 2. location(let/lon) 기준 거리 계산 → radius_km 이내 필터
-        radius_candidates = []
-        for st in stations:
-            if st.let is None or st.lon is None:
-                continue
-            st_lat = float(st.let)
-            st_lon = float(st.lon)
-            dist = haversine_distance(cur_lat, cur_lon, st_lat, st_lon)
-            if dist > radius_km:
-                continue
-            radius_candidates.append({
-                "model": st,
-                "lat": st_lat,
-                "lon": st_lon,
-                "distance_km": dist,
-            })
-
-        # 3. 가격(ntsl_pc) 있는 후보만 최저가 대상 → 0개면 빈 응답
-        priced_candidates = [
-            c for c in radius_candidates if c["model"].ntsl_pc is not None
-        ]
-        if not priced_candidates:
-            return NearestRecommendationResponse(
-                screen=f"battery_{status}",
-                vehicle=NearestRecommendationVehicleResponse(
-                    fuel_percent=fuel_percent,
-                    remaining_range=remaining_range,
-                    fuel_type=request.vehicle.fuel_type,
-                ),
-                ai_insight=self._build_insight(
-                    status, remaining_range, message=NO_STATION_MESSAGE
-                ),
-                recommended_station=None,
+        # 1. Gemini 단일 호출: SQL + insight 동시 생성
+        gemini_data = None
+        if self.ai_enabled and self.client:
+            gemini_data = await self._call_gemini_combined(
+                status, fuel_percent, remaining_range, lat, lon, radius_km, driving_habit
             )
 
-        # ntsl_pc 오름차순 → 최저가 1곳
-        priced_candidates.sort(key=lambda c: c["model"].ntsl_pc)
-        cheapest = priced_candidates[0]
-        station = cheapest["model"]
-
-        # 4. 최신 상태 1건 → 대기차량 추출
-        latest_status = await self._get_latest_status(station.chrstn_mno)
-        wait_vhcle_alge = latest_status.wait_vhcle_alge if latest_status else None
-
-        # 6. 예상 충전 비용
-        estimated_cost = calculate_estimated_cost(fuel_percent, station.ntsl_pc)
-
-        # 7. 반경 내 가격 있는 충전소 평균 대비 가격 차이 (음수면 평균보다 저렴)
-        avg_price = sum(c["model"].ntsl_pc for c in priced_candidates) / len(
-            priced_candidates
-        )
-        price_diff_from_avg = round(station.ntsl_pc - avg_price, 1)
-
-        recommended_station = NearestRecommendationStation(
-            chrstn_mno=station.chrstn_mno,
-            name=station.chrstn_nm,
-            road_nm_addr=station.road_nm_addr or station.lotno_addr,
-            distance_km=round(cheapest["distance_km"], 2),
-            ntsl_pc=station.ntsl_pc,
-            price_diff_from_avg=price_diff_from_avg,
-            estimated_cost=estimated_cost,
-            wait_vhcle_alge=wait_vhcle_alge,
-            is_open=station.oper_yn == "Y",
-            let=cheapest["lat"],
-            lon=cheapest["lon"],
+        # 2. 반경 내 후보 + 평균가·최저가 한 번만 조회 (SQL price_diff / Python 폴백 공용)
+        candidates, avg_price, min_price = await self._load_priced_candidates(
+            lat, lon, radius_km
         )
 
-        # 8. 권장 충전 시점 + ai_insight.message 생성 (Gemini, 실패 시 고정 템플릿 폴백)
-        ai_charge_timing, ai_message = await self._resolve_ai_insight(
-            status, remaining_range, recommended_station
-        )
+        # 3. 충전소 조회: Gemini SQL 우선, 실패 시 Python 폴백
+        station: NearestRecommendationStation | None = None
+        if gemini_data and gemini_data.get("station_sql"):
+            station = await self._fetch_station_by_sql(
+                gemini_data["station_sql"], lat, lon, radius_km,
+                fuel_percent, avg_price, min_price,
+            )
+        if station is None:
+            station = await self._fetch_station_by_python(
+                candidates, avg_price, min_price, fuel_percent
+            )
 
-        # 9. 응답 조립
+        # 4. 응답 조립
+        insight = self._build_insight(
+            status, remaining_range, gemini_data, driving_habit, no_station=(station is None)
+        )
         return NearestRecommendationResponse(
             screen=f"battery_{status}",
             vehicle=NearestRecommendationVehicleResponse(
@@ -370,11 +416,6 @@ class NearestRecommendationService:
                 remaining_range=remaining_range,
                 fuel_type=request.vehicle.fuel_type,
             ),
-            ai_insight=self._build_insight(
-                status,
-                remaining_range,
-                message=ai_message,
-                charge_timing=ai_charge_timing,
-            ),
-            recommended_station=recommended_station,
+            ai_insight=insight,
+            recommended_station=station,
         )
