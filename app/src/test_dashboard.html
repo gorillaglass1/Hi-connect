@@ -22,8 +22,11 @@
 
         /* ===== TOP STATUS BAR ===== */
         .status-bar {
-            background: #1c1c1e;
-            color: #fff;
+            /* background: #1c1c1e;  (기존: 검은 배경) */
+            /* color: #fff; */
+            background: #ffffff;               /* 변경: 흰 배경 */
+            color: #1d1d1f;                    /* 변경: 어두운 글자 */
+            border-bottom: 1px solid #e5e5ea;  /* 추가: 본문(#f2f2f7)과 경계 */
             height: 44px;
             display: flex;
             align-items: center;
@@ -42,7 +45,8 @@
         .gear-indicator {
             font-size: 28px;
             font-weight: 800;
-            color: #fff;
+            /* color: #fff; */
+            color: #1d1d1f;   /* 변경: 흰 배경 대비 */
             letter-spacing: -1px;
         }
 
@@ -55,7 +59,7 @@
             letter-spacing: 2px;
         }
 
-        .gear-labels .active { color: #fff; }
+        .gear-labels .active { /* color: #fff; */ color: #1d1d1f; }
 
         .range-display {
             display: flex;
@@ -63,7 +67,8 @@
             gap: 6px;
             font-size: 14px;
             font-weight: 600;
-            color: #fff;
+            /* color: #fff; */
+            color: #1d1d1f;   /* 변경 */
         }
 
         .range-display .km-value {
@@ -80,7 +85,8 @@
         .battery-icon .bar {
             width: 22px;
             height: 11px;
-            border: 1.5px solid #fff;
+            /* border: 1.5px solid #fff; */
+            border: 1.5px solid #3a3a3c;   /* 변경: 흰 배경 대비 */
             border-radius: 2px;
             position: relative;
             overflow: hidden;
@@ -99,7 +105,8 @@
         .battery-icon .tip {
             width: 3px;
             height: 5px;
-            background: #fff;
+            /* background: #fff; */
+            background: #3a3a3c;   /* 변경 */
             border-radius: 0 1px 1px 0;
         }
 
@@ -108,11 +115,12 @@
             align-items: center;
             gap: 16px;
             font-size: 13px;
-            color: #aeaeb2;
+            /* color: #aeaeb2; */
+            color: #3a3a3c;   /* 변경: 어두운 아이콘 */
         }
 
         .status-right i { font-size: 14px; }
-        .status-right .time { color: #fff; font-weight: 600; font-size: 14px; }
+        .status-right .time { /* color: #fff; */ color: #1d1d1f; font-weight: 600; font-size: 14px; }
 
         /* ===== MAIN 3-COLUMN LAYOUT ===== */
         .dashboard-main {
@@ -1137,6 +1145,8 @@
             <i class="fa-solid fa-bell"></i>
             <i class="fa-solid fa-bluetooth-b"></i>
             <i class="fa-solid fa-wifi"></i>
+            <!-- 추가: 설정 진입 톱니바퀴 (가운데 설정 버튼에서 이전). 클릭 시 기존 openSettings() 호출 -->
+            <i class="fa-solid fa-gear" onclick="openSettings()" style="cursor:pointer;" title="설정"></i>
             <span class="time" id="clockDisplay">오전 9:19</span>
         </div>
     </div>
@@ -1212,9 +1222,11 @@
                     <button class="mc-btn mc-btn-primary" onclick="fetchRecommendations()">
                         <i class="fa-solid fa-bolt-lightning"></i> 충전 추천
                     </button>
+                    <!-- 설정 진입은 상단 status-bar 톱니바퀴로 이전. 기존 버튼 주석 처리.
                     <button class="mc-btn mc-btn-secondary" onclick="openSettings()">
                         <i class="fa-solid fa-gear"></i> 설정
                     </button>
+                    -->
                 </div>
             </div>
 
