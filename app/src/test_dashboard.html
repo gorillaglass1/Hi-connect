@@ -376,9 +376,11 @@
         }
 
         .fuel-percentage {
-            font-size: 42px;
+            /* font-size: 42px; */
+            font-size: 32px;   /* ref_1: 슬림 게이지에 맞춰 축소 */
             font-weight: 800;
-            color: #34c759;
+            /* color: #34c759; */   /* 기존: 초록(충분) */
+            color: #ff3b30;         /* 변경: 잔량 부족 경고 빨강 */
             line-height: 1;
         }
 
@@ -410,7 +412,8 @@
 
         .fuel-battery-fill {
             height: 100%;
-            background: linear-gradient(90deg, #a8e063, #56ab2f);
+            /* background: linear-gradient(90deg, #a8e063, #56ab2f); */   /* 기존: 초록 */
+            background: linear-gradient(90deg, #ff6b6b, #ff3b30);          /* 변경: 빨강(부족). 단, syncFuelDisplay가 잔량별로 런타임에 덮어씀 */
             border-radius: 5px;
             transition: width 0.5s ease;
         }
@@ -422,6 +425,19 @@
         }
 
         .fuel-hint strong { color: #3a3a3c; }
+
+        /* 신규(ref_1): 슬림 수소 게이지 */
+        .fuel-gauge-head { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:12px; }
+        .fuel-range { font-size:12px; color:#8e8e93; font-weight:500; }
+        .fuel-range strong { color:#1d1d1f; font-weight:700; }
+        .fuel-track { width:100%; height:8px; background:#e5e5ea; border-radius:4px; overflow:hidden; }
+
+        /* 신규(ref_1): "충전이 필요합니다" 알림 카드 */
+        .alert-card { display:flex; align-items:center; gap:12px; background:#fff7ed; border:1px solid #fde4cf; border-radius:14px; padding:14px 16px; }
+        .alert-icon { width:34px; height:34px; border-radius:50%; background:#ff9500; color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
+        .alert-text-title { font-size:14px; font-weight:700; color:#1d1d1f; }
+        .alert-text-sub { font-size:12px; color:#8e8e93; margin-top:2px; }
+        .alert-pct { margin-left:auto; font-size:18px; font-weight:800; color:#ff9500; }
 
         /* Timing card */
         .timing-card {
@@ -493,11 +509,19 @@
             font-weight: 600;
         }
 
+        /* 신규(ref_1): "추천 충전소" 헤더 새로고침 아이콘 */
+        .rec-section-title .rec-refresh { color:#8e8e93; cursor:pointer; font-size:14px; transition:color 0.2s; }
+        .rec-section-title .rec-refresh:hover { color:#007aff; }
+
         .station-rec-card {
             background: #fff;
-            border-radius: 16px;
-            padding: 16px 20px;
+            /* border-radius: 16px; padding: 16px 20px; */   /* 기존 */
+            border-radius: 14px;
+            padding: 12px 14px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            display: flex;            /* ref_1: 핀/정보/액션 한 행 */
+            align-items: center;
+            gap: 12px;
         }
 
         .rec-station-row {
@@ -508,15 +532,16 @@
         }
 
         .rec-pin {
-            width: 36px;
-            height: 36px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
-            background: #007aff;
+            /* background: #007aff; color: #fff; font-size: 16px; */   /* 기존 */
+            background: #eaf2ff;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #fff;
-            font-size: 16px;
+            color: #007aff;
+            font-size: 14px;
             flex-shrink: 0;
         }
 
@@ -542,6 +567,25 @@
             font-weight: 600;
         }
 
+        /* 신규(ref_1): 이름 옆 "추천" 파란 알약 뱃지 */
+        .rec-station-name .rec-badge {
+            background: #007aff;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        /* 신규(ref_1): 우측 액션 칼럼(거리/대기/버튼) */
+        .rec-action {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
         .rec-station-meta {
             font-size: 11px;
             color: #8e8e93;
@@ -563,7 +607,8 @@
         }
 
         .rec-distance {
-            font-size: 18px;
+            /* font-size: 18px; */
+            font-size: 16px;
             font-weight: 700;
             color: #007aff;
         }
@@ -584,12 +629,14 @@
             background: #007aff;
             color: #fff;
             border: none;
-            padding: 8px 16px;
-            border-radius: 18px;
-            font-size: 12px;
+            /* padding: 8px 16px; border-radius: 18px; font-size: 12px; */   /* 기존 */
+            padding: 6px 12px;
+            border-radius: 14px;
+            font-size: 11px;
             font-weight: 600;
             cursor: pointer;
             transition: background 0.2s;
+            white-space: nowrap;
         }
 
         .btn-route:hover { background: #0066d6; }
@@ -1231,6 +1278,7 @@
             </div>
 
             <!-- Fuel Gauge -->
+            <!-- 기존 fuel-card는 ref_1 슬림 게이지로 교체. 원본 주석 보존:
             <div class="fuel-card">
                 <div class="fuel-label">수소 잔량</div>
                 <div class="fuel-row">
@@ -1244,8 +1292,20 @@
                     <strong>예상 주행 가능: <span id="fuelRangeText">45 km</span></strong>
                 </div>
             </div>
+            -->
+            <div class="fuel-card">
+                <div class="fuel-label">수소 잔량</div>
+                <div class="fuel-gauge-head">
+                    <div class="fuel-percentage" id="fuelPercent">28<span>%</span></div>
+                    <div class="fuel-range">예상 주행 <strong><span id="fuelRangeText">45 km</span></strong></div>
+                </div>
+                <div class="fuel-track">
+                    <div class="fuel-battery-fill" id="fuelBar" style="width: 28%"></div>
+                </div>
+            </div>
 
-            <!-- Timing card -->
+            <!-- 기존 timing-card는 ref_1 "충전이 필요합니다" 알림 카드로 교체. 원본 주석 보존: -->
+            <!--
             <div class="timing-card">
                 <div class="timing-title">지금 충전하기 좋은 타이밍이에요</div>
                 <div class="timing-desc">실시간 충전소 상태와 대기 시간을 기준으로 추천합니다.</div>
@@ -1260,11 +1320,21 @@
                     <span class="timing-badge">추천</span>
                 </div>
             </div>
+            -->
+            <div class="alert-card">
+                <div class="alert-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div>
+                    <div class="alert-text-title">충전이 필요합니다</div>
+                    <div class="alert-text-sub">주행 가능 거리가 줄었어요. 가까운 충전소를 추천해 드릴게요.</div>
+                </div>
+                <div class="alert-pct" id="alertFuelPct">28%</div>
+            </div>
 
             <!-- Recommended Stations -->
             <div class="rec-section-title">
                 추천 충전소
-                <span class="tag-new">새로고침</span>
+                <!-- 기존: <span class="tag-new">새로고침</span> -->
+                <i class="fa-solid fa-arrows-rotate rec-refresh" onclick="fetchRecommendations()" title="새로고침"></i>
             </div>
 
             <div id="loadingIndicator" class="loading-state" style="display:none;">
@@ -1374,10 +1444,14 @@
                 <div class="setting-row">
                     <span class="setting-label"><i class="fa-solid fa-user"></i> 시뮬레이션 사용자</span>
                     <select id="userSelector" onchange="onUserChanged()">
-                        <option value="1">김하나 - 인천 거주자</option>
-                        <option value="2">이도윤 - 경기 출퇴근자</option>
-                        <option value="3">박서준 - 외근 잦은 직장인</option>
-                        <option value="4">최민서 - 가격 초민감자</option>
+                        <!-- 기존: <option value="1">김하나 - 인천 거주자</option> -->
+                        <option value="1">김하나 - 가성비 중시형</option>
+                        <!-- 기존: <option value="2">이도윤 - 경기 출퇴근자</option> -->
+                        <option value="2">이도윤 - 최단경로 선호형</option>
+                        <!-- 기존: <option value="3">박서준 - 외근 잦은 직장인</option> -->
+                        <option value="3">박서준 - 시간·편의 중시형</option>
+                        <!-- 기존: <option value="4">최민서 - 가격 초민감자</option> -->
+                        <option value="4">최민서 - 가격 최우선형</option>
                     </select>
                 </div>
             </div>
@@ -1386,27 +1460,27 @@
             <div class="settings-section">
                 <div class="settings-section-title">개인 선호 가중치</div>
                 <div class="setting-row">
-                    <span class="setting-label"><i class="fa-solid fa-won-sign"></i> 가격</span>
+                    <!-- 기존 라벨: 가격 --><span class="setting-label"><i class="fa-solid fa-won-sign"></i> 저렴함 선호</span>
                     <input type="range" id="weightPrice" min="0.0" max="3.0" step="0.1" value="1.0" oninput="updateSliderLabel(this, 'weightPriceVal')">
                     <span class="setting-value" id="weightPriceVal">1.00</span>
                 </div>
                 <div class="setting-row">
-                    <span class="setting-label"><i class="fa-solid fa-clock"></i> 대기시간</span>
+                    <!-- 기존 라벨: 대기시간 --><span class="setting-label"><i class="fa-solid fa-clock"></i> 짧은 대기 선호</span>
                     <input type="range" id="weightWait" min="0.0" max="3.0" step="0.1" value="1.0" oninput="updateSliderLabel(this, 'weightWaitVal')">
                     <span class="setting-value" id="weightWaitVal">1.00</span>
                 </div>
                 <div class="setting-row">
-                    <span class="setting-label"><i class="fa-solid fa-route"></i> 우회거리</span>
+                    <!-- 기존 라벨: 우회거리 --><span class="setting-label"><i class="fa-solid fa-route"></i> 최단경로 선호</span>
                     <input type="range" id="weightDistance" min="0.0" max="3.0" step="0.1" value="1.0" oninput="updateSliderLabel(this, 'weightDistanceVal')">
                     <span class="setting-value" id="weightDistanceVal">1.00</span>
                 </div>
                 <div class="setting-row">
-                    <span class="setting-label"><i class="fa-solid fa-shop"></i> 편의시설</span>
+                    <!-- 기존 라벨: 편의시설 --><span class="setting-label"><i class="fa-solid fa-shop"></i> 편의시설 중시</span>
                     <input type="range" id="weightFacilities" min="0.0" max="3.0" step="0.1" value="1.0" oninput="updateSliderLabel(this, 'weightFacilitiesVal')">
                     <span class="setting-value" id="weightFacilitiesVal">1.00</span>
                 </div>
                 <div class="setting-row">
-                    <span class="setting-label"><i class="fa-solid fa-shield-halved"></i> 안전 계수</span>
+                    <!-- 기존 라벨: 안전 계수 --><span class="setting-label"><i class="fa-solid fa-shield-halved"></i> 안전 중시</span>
                     <input type="range" id="safetyMargin" min="1.0" max="1.5" step="0.05" value="1.1" oninput="updateSliderLabel(this, 'safetyMarginVal')">
                     <span class="setting-value" id="safetyMarginVal">1.10</span>
                 </div>
@@ -1583,12 +1657,23 @@
             document.getElementById('rangeKmDisplay').textContent = `${range}km`;
             document.getElementById('statusBattery').style.setProperty('--fuel-pct', `${pct}%`);
             document.getElementById('remainingRangeVal').textContent = `${range} km`;
+            const alertPctEl = document.getElementById('alertFuelPct');
+            if (alertPctEl) alertPctEl.textContent = `${pct}%`;   // 신규: 알림 카드 %를 게이지와 일치
 
             // Update bar color based on level
             const bar = document.getElementById('fuelBar');
-            if (pct > 50) bar.style.background = 'linear-gradient(90deg, #a8e063, #56ab2f)';
-            else if (pct > 20) bar.style.background = 'linear-gradient(90deg, #f7c948, #f2a900)';
-            else bar.style.background = 'linear-gradient(90deg, #ff6b6b, #ff3b30)';
+            // 신규: %글자색(#fuelPercent)을 바와 동일 임계값으로 함께 변경해 항상 일치시킴.
+            const pctText = document.getElementById('fuelPercent');
+            if (pct > 50) {
+                bar.style.background = 'linear-gradient(90deg, #a8e063, #56ab2f)';
+                pctText.style.color = '#34c759';   // 초록(충분)
+            } else if (pct > 20) {
+                bar.style.background = 'linear-gradient(90deg, #f7c948, #f2a900)';
+                pctText.style.color = '#f2a900';   // 주황(주의)
+            } else {
+                bar.style.background = 'linear-gradient(90deg, #ff6b6b, #ff3b30)';
+                pctText.style.color = '#ff3b30';   // 빨강(부족)
+            }
         }
 
         function updateRange(slider) {
@@ -2023,8 +2108,12 @@
             container.innerHTML = "";
 
             vehiclePayloads.forEach((vp, idx) => {
+                // 기존: 운영/주의 → 라벨을 "운영중"으로 변경 (상태 표시용)
+                // const openBadge = vp.is_reachable
+                //     ? `<span class="open-badge">운영</span>`
+                //     : `<span class="open-badge" style="background:#ff9500">주의</span>`;
                 const openBadge = vp.is_reachable
-                    ? `<span class="open-badge">운영</span>`
+                    ? `<span class="open-badge">운영중</span>`
                     : `<span class="open-badge" style="background:#ff9500">주의</span>`;
 
                 const waitText = vp.wait_vehicles > 0
@@ -2033,6 +2122,9 @@
 
                 // 변경: 카드 상세줄의 "700bar 사용 가능"은 하드코딩이었음 →
                 // 응답의 delivery_payload.pressure_info("700bar 사용 가능"/"700bar 사용 불가") 값 사용.
+                const recBadge = idx === 0 ? `<span class="rec-badge">추천</span>` : "";
+                // 기존 카드 템플릿(rec-station-row + rec-distance-row 2단)은 ref_1 한 행 레이아웃으로 교체. 원본 보존:
+                /*
                 const card = `
                     <div class="station-rec-card">
                         <div class="rec-station-row">
@@ -2057,6 +2149,24 @@
                             <button class="btn-route" data-chrstn-mno="${vp.chrstn_mno}">
                                 경로 안내
                             </button>
+                        </div>
+                    </div>
+                `;
+                */
+                const card = `
+                    <div class="station-rec-card">
+                        <div class="rec-pin"><i class="fa-solid fa-location-dot"></i></div>
+                        <div class="rec-station-info">
+                            <div class="rec-station-name">${vp.chrstn_nm} ${recBadge}</div>
+                            <div class="rec-station-meta">${vp.road_nm_addr || "주소 정보 없음"}</div>
+                            <div class="rec-station-details">
+                                ${openBadge} · ${vp.delivery_payload ? vp.delivery_payload.pressure_info : '700bar 정보 없음'} · ${vp.ntsl_pc ? vp.ntsl_pc.toLocaleString()+'원/kg' : '가격정보 없음'}
+                            </div>
+                        </div>
+                        <div class="rec-action">
+                            <div class="rec-distance">${vp.distance_to_station}<small>km</small></div>
+                            <div class="rec-wait">${waitText}</div>
+                            <button class="btn-route" data-chrstn-mno="${vp.chrstn_mno}">경유지 추가</button>
                         </div>
                     </div>
                 `;
