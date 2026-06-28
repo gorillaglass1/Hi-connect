@@ -72,4 +72,4 @@ async def mainPage():
 
 @app.get("/dashboard")
 async def dashboardPage():
-    return FileResponse("app/src/test_dashboard.html")
+    return FileResponse("app/src/dashboard.html")

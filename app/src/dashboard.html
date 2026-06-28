@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HyConnect | Pleos Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- 부팅 진단: 회색 화면 대신 실제 오류를 화면에 표시 (외부 JS 라이브러리 의존성 없음) -->
+    <script>
+        window.__appMounted = false;
+        function __showBootError(title, detail) {
+            var r = document.getElementById('root');
+            if (!r) return;
+            r.innerHTML = '<div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:Pretendard,sans-serif;background:#fff;color:#1d1d1f;padding:40px;text-align:center">'
+                + '<i class="fa-solid fa-triangle-exclamation" style="font-size:40px;color:#ff3b30"></i>'
+                + '<div style="font-size:18px;font-weight:800">대시보드를 불러오지 못했습니다</div>'
+                + '<div style="font-size:14px;font-weight:600;color:#ff3b30">' + title + '</div>'
+                + '<pre style="max-width:760px;white-space:pre-wrap;font:12px/1.5 monospace;color:#636366;background:#f6f7f9;border-radius:10px;padding:14px;text-align:left">' + (detail || '') + '</pre>'
+                + '<div style="font-size:12px;color:#8e8e93">브라우저 콘솔(F12)도 함께 확인해 주세요. 새로고침: Ctrl+Shift+R</div></div>';
+        }
+        window.addEventListener('error', function (e) {
+            var d = (e.error && e.error.stack) ? e.error.stack : (e.message || '');
+            if (e.filename) d += '\n@ ' + e.filename + ':' + e.lineno + ':' + e.colno;
+            __showBootError(String(e.message || '스크립트 오류'), d);
+        });
+    </script>
+
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+        :root {
+            --blue: #2b6cff; --blue-dark: #1f5be0; --ink: #16181d; --gray: #8a8f98;
+            --line: #ececef; --bg: #f1f1f4; --green: #15c463; --orange: #ff8a1e;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body, #root { height: 100%; }
+        body { background: #d9dadd; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--ink); overflow: hidden; }
+        .app-shell { height: 100vh; display: flex; flex-direction: column; background: #fff; }
+
+        /* ===== STATUS BAR ===== */
+        .status-bar { background: #fff; height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; flex-shrink: 0; border-bottom: 1px solid #f0f0f2; }
+        .status-left { display: flex; align-items: center; gap: 22px; }
+        .gear-p { font-size: 30px; font-weight: 800; letter-spacing: -1px; }
+        .prnd { display: flex; gap: 9px; font-size: 14px; font-weight: 700; color: #c4c7cd; letter-spacing: 2px; }
+        .prnd .on { color: #16181d; }
+        .range-chip { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 700; }
+        .mini-batt { width: 26px; height: 13px; border: 1.6px solid #1d1f24; border-radius: 3px; position: relative; }
+        .mini-batt::after { content: ''; position: absolute; left: 1.5px; top: 1.5px; bottom: 1.5px; width: var(--p,90%); background: #16181d; border-radius: 1px; }
+        .mini-batt .tip { position: absolute; right: -4px; top: 50%; transform: translateY(-50%); width: 2.5px; height: 6px; background: #1d1f24; border-radius: 0 1px 1px 0; }
+        .headlight { display: flex; align-items: center; gap: 3px; color: var(--green); font-size: 13px; font-weight: 800; letter-spacing: -1px; }
+        .headlight .lamp { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px rgba(21,196,99,.6); }
+        .status-right { display: flex; align-items: center; gap: 17px; font-size: 15px; color: #2a2d33; }
+        .status-right i { cursor: pointer; }
+        .avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--blue); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+        .signal { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; }
+        .signal .bars { display: flex; align-items: flex-end; gap: 2px; height: 13px; }
+        .signal .bars span { width: 3px; background: #16181d; border-radius: 1px; }
+        .status-time { color: #16181d; font-weight: 700; font-size: 15px; }
+
+        /* ===== MAIN 3-COLUMN ===== */
+        .dashboard-main { flex: 1; display: grid; grid-template-columns: 520px 1.18fr 1fr; min-height: 0; background: #fff; }
+
+        /* ===== LEFT VEHICLE PANEL ===== */
+        .vehicle-panel { background: #fff; display: flex; flex-direction: column; position: relative; padding: 8px 24px 18px; overflow: hidden; }
+        .car-stage { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; min-height: 240px; }
+        .car-stage svg.car { width: 400px; max-width: 100%; }
+        .car-tag { position: absolute; text-align: center; font-size: 13px; font-weight: 700; color: #2a2d33; line-height: 1.25; }
+        .car-tag small { display: block; font-size: 11px; font-weight: 500; color: #9a9ea6; }
+        .car-tag .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #c4c7cd; margin-top: 4px; }
+        .tag-charge { top: 24px; left: 50%; transform: translateX(-30%); }
+        .tag-mirror { top: 110px; left: 6px; }
+        .tag-trunk { top: 110px; right: 14px; }
+        .lock-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 2px 16px; }
+        .lock-info { display: flex; align-items: center; gap: 12px; }
+        .lock-toggle { width: 52px; height: 30px; border-radius: 15px; background: var(--green); position: relative; cursor: pointer; transition: background .25s; flex-shrink: 0; }
+        .lock-toggle.off { background: #d2d4d9; }
+        .lock-toggle .knob { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--green); transition: transform .25s; }
+        .lock-toggle.off .knob { transform: translateX(22px); color: #b0b3b9; }
+        .lock-label { font-size: 16px; font-weight: 700; }
+        .lock-label small { display: block; font-size: 13px; font-weight: 500; color: #9a9ea6; margin-top: 1px; }
+        .lock-km { font-size: 15px; font-weight: 600; color: #9a9ea6; }
+        .tire-card { background: #fff; border-top: 1px solid #f0f0f2; padding: 16px 2px 0; }
+        .tire-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+        .tire-layout { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 4px 16px; }
+        .tire-val { font-size: 19px; font-weight: 700; }
+        .tire-val small { font-size: 12px; font-weight: 500; color: #9a9ea6; margin-left: 2px; }
+        .tire-val.r { text-align: left; } .tire-val.l { text-align: right; }
+
+        /* ===== CENTER APP ===== */
+        .app-column { background: var(--bg); display: flex; flex-direction: column; align-items: stretch; padding: 12px 14px 14px; min-height: 0; }
+        .app-frame { width: 100%; max-width: none; flex: 1; min-height: 0; background: #fff; border-radius: 22px; box-shadow: 0 10px 40px rgba(20,24,40,.10); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .app-notch { width: 120px; height: 5px; border-radius: 3px; background: #e3e4e8; margin: 10px auto 0; flex-shrink: 0; }
+        .app-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px 18px 14px; gap: 10px; }
+        .app-head { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .app-brand { font-size: 15px; font-weight: 800; color: var(--blue); letter-spacing: -.3px; }
+        .app-gear { color: #b0b3b9; cursor: pointer; font-size: 16px; }
+        .gauge { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+        .gauge .lbl { font-size: 13px; font-weight: 600; color: var(--gray); }
+        .gauge .track { flex: 1; height: 9px; border-radius: 5px; background: #eceef1; overflow: hidden; }
+        .gauge .fill { height: 100%; border-radius: 5px; transition: width .5s ease, background .3s; }
+        .gauge .pct { font-size: 15px; font-weight: 800; }
+        .gauge .km { font-size: 13px; font-weight: 600; color: var(--gray); min-width: 46px; text-align: right; }
+
+        /* sufficient */
+        .insight-card, .price-card, .list-card { border: 1px solid var(--line); border-radius: 16px; }
+        .insight-card { padding: 14px 16px; flex-shrink: 0; }
+        .insight-head { display: flex; align-items: center; justify-content: space-between; }
+        .insight-status { font-size: 13px; font-weight: 700; color: var(--green); display: flex; align-items: center; gap: 7px; }
+        .insight-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+        .insight-time { font-size: 12px; color: #b0b3b9; font-weight: 500; }
+        .insight-title { font-size: 19px; font-weight: 800; margin-top: 7px; letter-spacing: -.4px; }
+        .insight-desc { font-size: 13px; color: #6c7077; line-height: 1.5; margin-top: 6px; }
+        .metric-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 12px; }
+        .metric-chip { background: #f6f7f9; border-radius: 12px; padding: 11px 12px; }
+        .metric-chip .m-l { font-size: 11px; color: #9a9ea6; font-weight: 600; }
+        .metric-chip .m-v { font-size: 18px; font-weight: 800; margin-top: 5px; letter-spacing: -.3px; }
+        .metric-chip .m-v small { font-size: 12px; font-weight: 600; color: #9a9ea6; margin-left: 2px; }
+        .metric-chip .m-v.ok { color: var(--green); }
+        .app-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin: -2px -4px; padding: 2px 4px; }
+        .app-scroll::-webkit-scrollbar { width: 4px; } .app-scroll::-webkit-scrollbar-thumb { background: #d8dade; border-radius: 2px; }
+        .price-card { padding: 14px 16px; flex-shrink: 0; }
+        .badge-row { display: flex; align-items: center; gap: 6px; }
+        .badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 8px; }
+        .badge.fill { background: var(--blue); color: #fff; }
+        .badge.outline { border: 1px solid var(--blue); color: var(--blue); }
+        .badge.open { margin-left: auto; color: var(--green); }
+        .ps-name { font-size: 19px; font-weight: 800; margin-top: 10px; letter-spacing: -.4px; }
+        .ps-addr { font-size: 13px; color: #9a9ea6; margin-top: 3px; }
+        .ps-metrics { display: flex; gap: 30px; margin-top: 12px; }
+        .ps-metric .pm-l { font-size: 12px; color: #9a9ea6; }
+        .ps-metric .pm-v { font-size: 16px; font-weight: 700; margin-top: 4px; }
+        .ps-cost { background: #f0f5ff; border-radius: 12px; padding: 11px 14px; margin-top: 12px; display: flex; align-items: center; justify-content: space-between; }
+        .ps-cost .c-unit-l, .ps-cost .c-total-l { font-size: 12px; color: #7e93c4; }
+        .ps-cost .c-unit-v { font-size: 17px; font-weight: 800; margin-top: 4px; }
+        .ps-cost .c-save { font-size: 12px; color: var(--blue); font-weight: 600; margin-top: 3px; }
+        .ps-cost .c-total-v { font-size: 19px; font-weight: 800; color: var(--blue); margin-top: 4px; text-align: right; }
+        .cta { flex-shrink: 0; background: var(--blue); color: #fff; border: none; border-radius: 14px; padding: 13px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background .2s; }
+        .cta:hover { background: var(--blue-dark); }
+
+        /* needs charge */
+        .alert-box { background: #fff5ec; border: 1px solid #ffe3c9; border-radius: 14px; padding: 14px 16px; display: flex; gap: 12px; flex-shrink: 0; }
+        .alert-box .ic { width: 22px; height: 22px; border-radius: 50%; background: var(--orange); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+        .alert-box .a-title { font-size: 15px; font-weight: 800; color: #f07a13; }
+        .alert-box .a-sub { font-size: 13px; color: #8a7a68; margin-top: 4px; }
+        .list-card { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 18px 18px 6px; }
+        .list-head { display: flex; align-items: flex-start; justify-content: space-between; flex-shrink: 0; }
+        .list-head .lh-title { font-size: 17px; font-weight: 800; }
+        .list-head .lh-sub { font-size: 12px; color: #9a9ea6; margin-top: 3px; }
+        .refresh-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: #6c7077; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: background .2s; }
+        .refresh-btn:hover { background: #f6f7f9; }
+        .refresh-btn:disabled { opacity: .5; cursor: default; }
+        .refresh-btn i.spin { animation: spin .8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .st-list { flex: 1; min-height: 0; overflow-y: auto; margin-top: 8px; }
+        .st-list::-webkit-scrollbar { width: 4px; } .st-list::-webkit-scrollbar-thumb { background: #d8dade; border-radius: 2px; }
+        .st-row { display: flex; align-items: center; gap: 14px; padding: 16px 2px; border-top: 1px solid #f3f3f5; }
+        .st-row:first-child { border-top: none; }
+        .st-pin { width: 26px; flex-shrink: 0; color: #c4c7cd; font-size: 19px; text-align: center; }
+        .st-pin.rec { color: var(--blue); }
+        .st-main { flex: 1; min-width: 0; }
+        .st-name { font-size: 15.5px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+        .st-name .rec-badge { font-size: 11px; font-weight: 700; color: var(--blue); background: #eaf1ff; border-radius: 7px; padding: 2px 7px; }
+        .st-addr { font-size: 12.5px; color: #9a9ea6; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .st-status { font-size: 12.5px; margin-top: 4px; }
+        .st-status .op { color: var(--blue); font-weight: 700; }
+        .st-status .sep { color: #d2d4d9; margin: 0 5px; }
+        .st-status .pr { color: #8a8f98; }
+        .st-right { text-align: right; flex-shrink: 0; }
+        .st-dist { font-size: 15.5px; font-weight: 800; }
+        .st-wait { font-size: 12px; color: #9a9ea6; margin-top: 3px; }
+        .st-add-btn { flex-shrink: 0; background: var(--blue); color: #fff; border: none; border-radius: 12px; padding: 11px 16px; font-size: 13.5px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background .2s; }
+        .st-add-btn:hover { background: var(--blue-dark); }
+        .center-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #b0b3b9; gap: 12px; padding: 30px; text-align: center; }
+        .center-state i { font-size: 2rem; } .center-state.error i { color: #ff6b3d; }
+
+        /* ===== 주행 습관 점수 카드 (메인 대시보드 상단) ===== */
+        .habit-card { border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; flex-shrink: 0; }
+        .habit-head { display: flex; align-items: center; justify-content: space-between; }
+        .habit-head .t { font-size: 15px; font-weight: 800; }
+        .habit-reset { font-size: 12px; color: #9a9ea6; font-weight: 600; cursor: pointer; background: none; border: none; font-family: inherit; display: flex; align-items: center; gap: 5px; }
+        .habit-reset:hover { color: #6c7077; }
+        .habit-score { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 8px; }
+        .habit-score .big { font-size: 34px; font-weight: 800; color: var(--blue); letter-spacing: -1.5px; line-height: 1; }
+        .habit-score .big small { font-size: 15px; font-weight: 700; color: var(--blue); margin-left: 3px; letter-spacing: 0; }
+        .habit-score .grade { font-size: 14px; font-weight: 800; }
+        .habit-sub { font-size: 12px; color: #9a9ea6; margin-top: 6px; font-weight: 500; }
+        .habit-level { background: #f6f7f9; border-radius: 12px; padding: 11px 14px; margin-top: 11px; }
+        .hl-top { display: flex; align-items: center; justify-content: space-between; }
+        .hl-top .l { font-size: 11.5px; color: #9a9ea6; font-weight: 600; }
+        .hl-top .lv { font-size: 14px; font-weight: 800; color: var(--blue); }
+        .hl-mid { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 6px; }
+        .hl-mid .lt { font-size: 11.5px; color: #9a9ea6; font-weight: 600; }
+        .hl-points { font-size: 20px; font-weight: 800; letter-spacing: -.4px; }
+        .hl-points small { font-size: 12px; font-weight: 700; color: #9a9ea6; margin-left: 2px; }
+        .hl-gain { font-size: 12px; font-weight: 700; color: var(--blue); margin-left: 8px; }
+        .hl-bar { height: 7px; border-radius: 4px; background: #e6e8ec; overflow: hidden; margin-top: 9px; }
+        .hl-bar .f { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg,#2b6cff,#5b8cff); transition: width .5s ease; }
+        .hl-foot { font-size: 11.5px; color: #9a9ea6; font-weight: 600; margin-top: 6px; }
+        .habit-info { display: flex; gap: 11px; align-items: flex-start; background: #f3f7ff; border: 1px solid #e3ecff; border-radius: 12px; padding: 10px 12px; margin-top: 11px; }
+        .habit-info .ic { width: 22px; height: 22px; border-radius: 50%; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 1px; font-weight: 800; }
+        .habit-info .it { font-size: 13.5px; font-weight: 800; }
+        .habit-info .id { font-size: 12.5px; color: #6c7077; margin-top: 3px; line-height: 1.5; }
+        .habit-metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 11px; }
+        .habit-metrics .mc { background: #f6f7f9; border-radius: 12px; padding: 10px 12px; }
+        .habit-metrics .mc .l { font-size: 11px; color: #9a9ea6; font-weight: 600; }
+        .habit-metrics .mc .v { font-size: 18px; font-weight: 800; margin-top: 5px; color: #ff6b3d; }
+        .habit-metrics .mc .v small { font-size: 12px; font-weight: 700; color: #9a9ea6; margin-left: 2px; }
+
+        /* ===== MAP ===== */
+        .map-panel { position: relative; overflow: hidden; background: #e8eaed; display: flex; flex-direction: column; }
+        .map-container { flex: 1; position: relative; overflow: hidden; }
+        #mapCanvas { width: 100%; height: 100%; display: block; }
+        .map-overlay-dist { position: absolute; top: 14px; left: 14px; font-size: 12px; color: #6c7077; background: rgba(255,255,255,.9); padding: 5px 12px; border-radius: 9px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+        .loc-pill { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); background: #fff; border-radius: 16px; padding: 7px 16px; font-size: 14px; font-weight: 700; box-shadow: 0 3px 12px rgba(0,0,0,.14); }
+        .nav-countdown { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; background: rgba(22,23,25,.95); backdrop-filter: blur(20px); color: #fff; border-radius: 16px; padding: 14px 18px; box-shadow: 0 8px 30px rgba(0,0,0,.25); z-index: 20; }
+        .nav-countdown .nc-sub { font-size: 11px; color: #aeb2b9; font-weight: 500; }
+        .nav-countdown .nc-name { font-size: 14px; font-weight: 700; margin-top: 2px; }
+        .nav-countdown button { display: flex; align-items: center; gap: 8px; background: var(--blue); color: #fff; border: none; border-radius: 18px; padding: 8px 16px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; }
+        .nav-countdown .num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,.2); font-size: 12px; }
+        .nav-banner { position: absolute; bottom: 92px; left: 16px; background: rgba(43,108,255,.96); color: #fff; border-radius: 12px; padding: 9px 14px; font-size: 13px; font-weight: 700; box-shadow: 0 4px 16px rgba(0,0,0,.18); z-index: 20; }
+        .map-search { position: absolute; left: 16px; right: 16px; bottom: 18px; display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 16px; padding: 12px 18px; box-shadow: 0 6px 22px rgba(0,0,0,.10); z-index: 10; }
+        .map-search .q { display: flex; align-items: center; gap: 11px; flex: 1; }
+        .map-search .q input { border: none; outline: none; font-family: inherit; font-size: 15px; width: 100%; background: none; }
+        .map-search .q i { color: #9a9ea6; }
+        .map-search .shorts { display: flex; align-items: center; gap: 20px; color: #2a2d33; font-size: 17px; }
+        .map-search .shorts i { cursor: pointer; }
+        .map-search .shorts .charge { width: 32px; height: 32px; border-radius: 50%; background: #16181d; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+
+        /* ===== CLIMATE BAR ===== */
+        .climate-bar { background: #161719; height: 56px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 26px; color: #9a9ea6; }
+        .cl-group { display: flex; align-items: center; gap: 14px; font-size: 18px; }
+        .cl-group .seg { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+        .cl-group .seg .v { color: #cfd2d6; }
+        .cl-center { display: flex; align-items: center; gap: 18px; font-size: 17px; }
+        .cl-center .play { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #3a3c40; display: flex; align-items: center; justify-content: center; color: #cfd2d6; }
+
+        /* ===== MODALS ===== */
+        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 200; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .overlay.open { display: flex; }
+        .sheet { background: #fff; border-radius: 20px; width: 460px; max-height: 84vh; overflow-y: auto; padding: 26px; box-shadow: 0 24px 80px rgba(0,0,0,.25); }
+        .sheet h2 { font-size: 18px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+        .sheet .x { width: 30px; height: 30px; border-radius: 50%; background: #f0f0f2; border: none; cursor: pointer; font-size: 14px; color: #6c7077; }
+        .sec-t { font-size: 12px; font-weight: 700; color: #9a9ea6; text-transform: uppercase; letter-spacing: .5px; margin: 18px 0 10px; }
+        .row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; font-size: 14px; gap: 10px; }
+        .row .lab { display: flex; align-items: center; gap: 8px; }
+        .row .lab i { color: #9a9ea6; width: 16px; text-align: center; }
+        .row select, .ci { padding: 7px 12px; border-radius: 9px; border: 1px solid #d8dade; font-family: inherit; font-size: 13px; outline: none; }
+        .row input[type=range] { flex: 1; margin: 0 6px; }
+        .sval { font-size: 13px; font-weight: 700; color: var(--blue); min-width: 52px; text-align: right; }
+        .preset-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+        .preset-grid button { padding: 7px 12px; border-radius: 12px; border: 1px solid #e5e6e9; background: #f6f7f9; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .preset-grid button.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+        .coord-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .ci { width: 100%; } .ci-l { font-size: 11px; color: #9a9ea6; margin-bottom: 4px; font-weight: 500; }
+        .sbtn { width: 100%; padding: 12px; border-radius: 12px; font-size: 14px; font-weight: 700; border: none; cursor: pointer; font-family: inherit; margin-top: 10px; }
+        .sbtn.primary { background: var(--blue); color: #fff; } .sbtn.secondary { background: #f0f0f2; color: #16181d; }
+        .toggle { position: relative; width: 44px; height: 26px; cursor: pointer; }
+        .toggle input { display: none; }
+        .toggle .tk { width: 100%; height: 100%; background: #d2d4d9; border-radius: 13px; transition: background .3s; }
+        .toggle input:checked + .tk { background: var(--green); }
+        .toggle .tk::after { content: ''; position: absolute; width: 22px; height: 22px; background: #fff; border-radius: 50%; top: 2px; left: 2px; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .3s; }
+        .toggle input:checked + .tk::after { transform: translateX(18px); }
+        .nl-input { width: 100%; padding: 9px 12px; border: 1px solid #d8dade; border-radius: 10px; font-size: 13px; font-family: inherit; outline: none; margin-top: 8px; }
+        .terminal { background: #161719; border-radius: 10px; padding: 12px; margin-top: 10px; max-height: 120px; overflow-y: auto; font-family: 'SF Mono','Fira Code',monospace; font-size: 11px; color: #9a9ea6; }
+        .terminal .ln { margin-bottom: 3px; line-height: 1.5; }
+        .wp-card { border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 8px 0 18px; }
+        .wp-card .n { font-size: 16px; font-weight: 700; }
+        .wp-card .a { font-size: 12.5px; color: #9a9ea6; margin-top: 4px; }
+        .wp-card .m { font-size: 12.5px; color: #6c7077; margin-top: 6px; }
+        .wp-actions { display: flex; gap: 8px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+    "use strict";
+    (function () {
+        // ===================== 상수 =====================
+        const NEAREST_RANGE_THRESHOLD = 100;   // 이상이면 잔량 충분 → /nearest-recommendation
+        const MAX_RANGE = 500;
+        const AUTO_ALPHA_RATIO = 0.6;
+
+        const USER_OPTIONS = [
+            { id: 1, label: "김하나 - 인천 거주자" },
+            { id: 2, label: "이도윤 - 경기 출퇴근자" },
+            { id: 3, label: "박서준 - 외근 잦은 직장인" },
+            { id: 4, label: "최민서 - 가격 초민감자" },
+        ];
+        const USER_PRESETS = {
+            1: { weight_price: 2.2, weight_waiting_time: 1.5, weight_distance: 1.0, weight_facilities: 0.5, safety_margin: 1.1 },
+            2: { weight_price: 1.0, weight_waiting_time: 1.2, weight_distance: 2.5, weight_facilities: 1.2, safety_margin: 1.1 },
+            3: { weight_price: 1.2, weight_waiting_time: 2.0, weight_distance: 1.5, weight_facilities: 2.0, safety_margin: 1.15 },
+            4: { weight_price: 3.0, weight_waiting_time: 0.5, weight_distance: 0.8, weight_facilities: 0.5, safety_margin: 1.05 },
+        };
+        const PRESETS = [
+            { label: "성남 시흥동 → 판교", cur: [37.4350, 127.1265], dest: [37.3950, 127.1110] },
+            { label: "인천시청 → 인천공항", cur: [37.4050, 126.7210], dest: [37.4600, 126.4500] },
+            { label: "강남역 → 분당", cur: [37.4979, 127.0276], dest: [37.3910, 127.1120] },
+        ];
+        const SUF_LABEL = { sufficient: "수소 잔량 충분", recommend: "충전 권장", urgent: "충전 필요" };
+        const SUF_TITLE = { sufficient: "지금 충전이 급하지 않아요", recommend: "슬슬 충전해 두면 좋아요", urgent: "지금 충전이 필요해요" };
+
+        const WEIGHT_FIELDS = [
+            ["weight_price", "가격", "fa-won-sign", 0, 3, 0.1],
+            ["weight_waiting_time", "대기시간", "fa-clock", 0, 3, 0.1],
+            ["weight_distance", "우회거리", "fa-route", 0, 3, 0.1],
+            ["weight_facilities", "편의시설", "fa-shop", 0, 3, 0.1],
+            ["safety_margin", "안전 계수", "fa-shield-halved", 1, 1.5, 0.05],
+        ];
+        const HABIT_FIELDS = [
+            ["avg_score", "주행 습관 점수", "fa-gauge-simple-high", 0, 100, 1, "점"],
+            ["total_sessions", "주행 세션", "fa-list-check", 0, 100, 1, "회"],
+            ["harsh_accel_count", "급가속", "fa-gauge-high", 0, 30, 1, "회"],
+            ["harsh_brake_count", "급정거", "fa-car-burst", 0, 30, 1, "회"],
+            ["incautious_count", "부주의", "fa-triangle-exclamation", 0, 30, 1, "회"],
+        ];
+
+        // ===================== 헬퍼 =====================
+        const num = (v) => (v == null ? "-" : (Math.round(Number(v) * 10) / 10).toLocaleString());
+        const won = (v) => (v == null ? null : Number(v).toLocaleString());
+        const etaMin = (km) => Math.max(1, Math.round(Number(km) * 3.3));
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        // 미니 하이퍼스크립트: el(tag, attrs, ...children) → DOM 노드 (React 없이 선언형 빌드)
+        function el(tag, attrs) {
+            const n = document.createElement(tag);
+            if (attrs) for (const k in attrs) {
+                const v = attrs[k];
+                if (v == null || v === false) continue;
+                if (k === "class") n.className = v;
+                else if (k === "html") n.innerHTML = v;
+                else if (k === "style" && typeof v === "object") Object.assign(n.style, v);
+                else if (k.length > 2 && k.slice(0, 2) === "on" && typeof v === "function") n.addEventListener(k.slice(2).toLowerCase(), v);
+                else n.setAttribute(k, v === true ? "" : v);
+            }
+            for (let i = 2; i < arguments.length; i++) appendKids(n, arguments[i]);
+            return n;
+        }
+        function appendKids(n, kid) {
+            if (kid == null || kid === false) return;
+            if (Array.isArray(kid)) { kid.forEach((k) => appendKids(n, k)); return; }
+            n.appendChild(kid.nodeType ? kid : document.createTextNode(String(kid)));
+        }
+
+        // ===================== 스키마 검증 (송수신 데이터 점검 → 콘솔/터미널 로그) =====================
+        const typeOf = (v) => Array.isArray(v) ? "array" : v === null ? "null" : typeof v;
+        function inspect(label, obj, spec, opts, logFn) {
+            opts = opts || {};
+            const problems = [];
+            if (obj == null || typeof obj !== "object") {
+                problems.push(`객체가 아님 (실제 ${typeOf(obj)})`);
+            } else {
+                for (const k in spec) {
+                    const rule = spec[k];
+                    if (!Object.prototype.hasOwnProperty.call(obj, k)) { if (rule.required) problems.push(`누락:${k}`); continue; }
+                    const v = obj[k], t = typeOf(v);
+                    if (v === null) { if (rule.required && !rule.nullable) problems.push(`null불가:${k}`); continue; }
+                    if (rule.type && t !== rule.type) problems.push(`타입:${k}=${t}(기대 ${rule.type})`);
+                    if (rule.of && t === "object") inspect(`${label}.${k}`, v, rule.of, {}, null).forEach((p) => problems.push(`${k}.${p}`));
+                }
+                if (opts.forbidExtra) for (const k in obj) if (!(k in spec)) problems.push(`미허용필드:${k}`);
+            }
+            if (problems.length) console.warn("[schema]", label, problems);
+            if (logFn) logFn(problems.length ? `[검증] ${label} ⚠ ${problems.join(", ")}` : `[검증] ${label} OK`, problems.length ? "warning" : "success");
+            return problems;
+        }
+        function inspectList(label, arr, itemSpec, logFn) {
+            if (!Array.isArray(arr)) { logFn && logFn(`[검증] ${label} ⚠ 배열이 아님 (실제 ${typeOf(arr)})`, "warning"); return; }
+            if (arr.length === 0) { logFn && logFn(`[검증] ${label} 빈 배열`, "info"); return; }
+            const p = inspect(`${label}[0]`, arr[0], itemSpec, {}, null);
+            logFn && logFn(p.length ? `[검증] ${label}[0] ⚠ ${p.join(", ")}` : `[검증] ${label} OK (${arr.length}건)`, p.length ? "warning" : "success");
+        }
+        const SCHEMA = {
+            nearestReq: {
+                vehicle: { type: "object", required: true, of: { fuel_percent: { type: "number", required: true }, remaining_range: { type: "number", required: true }, fuel_type: { type: "string", required: true } } },
+                location: { type: "object", required: true, of: { let: { type: "number", required: true }, lon: { type: "number", required: true } } },
+                context: { type: "object", of: { radius_km: { type: "number" } } },
+            },
+            deliveryReq: {
+                user_id: { type: "number", nullable: true }, current_latitude: { type: "number", required: true }, current_longitude: { type: "number", required: true },
+                destination_latitude: { type: "number", nullable: true }, destination_longitude: { type: "number", nullable: true },
+                remaining_range: { type: "number", required: true }, nl_query: { type: "string", nullable: true },
+            },
+            learnReq: { chrstn_mno: { type: "string", required: true } },
+            prefReq: { weight_price: { type: "number", required: true }, weight_waiting_time: { type: "number", required: true }, weight_distance: { type: "number", required: true }, weight_facilities: { type: "number", required: true }, safety_margin: { type: "number", required: true } },
+            nearestRes: {
+                screen: { type: "string", required: true }, vehicle: { type: "object", required: true },
+                ai_insight: { type: "object", required: true, of: { status: { type: "string" }, status_label: { type: "string" }, subtitle: { type: "string" }, message: { type: "string" }, metrics: { type: "array" } } },
+                recommended_station: { type: "object", nullable: true },
+            },
+            nearestStationRes: { chrstn_mno: { type: "string", required: true }, name: { type: "string", required: true }, road_nm_addr: { type: "string", nullable: true }, distance_km: { type: "number", required: true }, ntsl_pc: { type: "number", nullable: true }, price_diff_from_avg: { type: "number", required: true }, estimated_cost: { type: "number", required: true }, wait_vhcle_alge: { type: "number", nullable: true }, is_open: { type: "boolean", required: true }, let: { type: "number", required: true }, lon: { type: "number", required: true } },
+            stationCardRes: { id: { type: "string", required: true }, name: { type: "string", required: true }, status: { type: "string" }, pressureInfo: { type: "string" }, distanceKm: { type: "number", required: true }, waitMinutes: { type: "number" }, isRecommended: { type: "boolean" }, latitude: { type: "number" }, longitude: { type: "number" } },
+            prefRes: { weight_price: { type: "number", required: true }, weight_waiting_time: { type: "number", required: true }, weight_distance: { type: "number", required: true }, weight_facilities: { type: "number", required: true }, safety_margin: { type: "number", required: true }, user_id: { type: "number" } },
+            stationRes: { chrstn_mno: { type: "string" }, chrstn_nm: { type: "string" }, let: { type: "number", nullable: true }, lon: { type: "number", nullable: true } },
+        };
+
+        // ===================== 상태 =====================
+        const state = {
+            userId: 1,
+            cur: [37.4350, 127.1265],
+            dest: [37.3950, 127.1110],
+            range: 500,
+            presetIdx: 0,
+            weights: Object.assign({}, USER_PRESETS[1]),
+            aiEnabled: false,
+            nlQuery: "",
+            status: "idle",
+            stations: [],
+            nearest: null,
+            error: null,
+            allStations: [],
+            drivingHabit: {
+                total_sessions: 8, total_driving_minutes: 240,
+                harsh_accel_count: 6, harsh_brake_count: 4, incautious_count: 3,
+                avg_score: 88,
+                points: 3480, last_gain: 85, level: 4, level_title: "베테랑 드라이버",
+                next_level_remain: 520, level_progress: 0.82,
+            },
+            settingsOpen: false,
+            pendingWp: null,
+            waypoint: null,
+            nav: false,
+            countdown: null,
+            logs: ["&gt; Gemini 지능형 번역 엔진이 준비되었습니다."],
+        };
+        const ui = {};            // DOM 참조 캐시
+        let refreshTimer = null;
+        let cdTimer = null;
+
+        function log(msg, type) {
+            const icon = type === "success" ? "<span style='color:#15c463'>[OK]</span> "
+                : type === "warning" ? "<span style='color:#ff3b30'>[WARN]</span> " : "&gt; ";
+            state.logs.push(icon + msg);
+            renderLog();
+        }
+        function scheduleRefresh() { clearTimeout(refreshTimer); refreshTimer = setTimeout(handleRefresh, 400); }
+
+        // ===================== 정적 셸 (값이 바뀌지 않는 마크업) =====================
+        const CAR_SVG = `
+            <svg class="car" viewBox="0 0 360 230" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="bodyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="0.42" stop-color="#eef0f3"/><stop offset="0.74" stop-color="#d2d6dd"/><stop offset="1" stop-color="#b5bac2"/></linearGradient>
+                    <linearGradient id="lowerG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c0c4cb"/><stop offset="1" stop-color="#878c95"/></linearGradient>
+                    <linearGradient id="hoodG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dde0e6"/></linearGradient>
+                    <linearGradient id="glassG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dbe2ea"/><stop offset="0.5" stop-color="#a9b7c8"/><stop offset="1" stop-color="#8092a7"/></linearGradient>
+                    <radialGradient id="floorG" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#b9bdc4" stop-opacity="0.5"/><stop offset="1" stop-color="#b9bdc4" stop-opacity="0"/></radialGradient>
+                    <radialGradient id="rimG" cx="0.38" cy="0.34" r="0.72"><stop offset="0" stop-color="#f1f3f5"/><stop offset="1" stop-color="#969ca4"/></radialGradient>
+                    <radialGradient id="lampG" cx="0.3" cy="0.4" r="0.85"><stop offset="0" stop-color="#ffffff"/><stop offset="0.55" stop-color="#deeefc"/><stop offset="1" stop-color="#97c2ee"/></radialGradient>
+                </defs>
+
+                <!-- ground shadow -->
+                <ellipse cx="184" cy="206" rx="150" ry="18" fill="url(#floorG)"/>
+                <ellipse cx="190" cy="201" rx="118" ry="10" fill="#a4aab2" opacity="0.32"/>
+
+                <!-- rocker / lower body -->
+                <path d="M58 152 Q66 176 96 180 L286 180 Q318 176 322 152 L319 170 Q302 180 272 181 L102 181 Q72 180 60 168 Z" fill="url(#lowerG)"/>
+
+                <!-- main body -->
+                <path d="M46 150 Q56 177 92 181 L288 181 Q323 177 327 150 Q323 132 300 124 L286 120 Q250 113 196 112 L150 113 Q104 116 78 126 Q58 135 46 150 Z" fill="url(#bodyG)" stroke="#aeb4bd" stroke-width="1.4"/>
+
+                <!-- cabin / roof -->
+                <path d="M108 120 Q126 65 175 60 L224 61 Q269 67 297 121 Z" fill="url(#bodyG)" stroke="#aeb4bd" stroke-width="1.4"/>
+
+                <!-- greenhouse glass: windshield + door + rear quarter -->
+                <path d="M118 116 Q132 78 169 73 L171 116 Z" fill="url(#glassG)"/>
+                <path d="M179 73 L207 74 L209 116 L181 116 Z" fill="url(#glassG)"/>
+                <path d="M217 75 Q257 82 281 116 L219 116 Z" fill="url(#glassG)"/>
+                <path d="M126 111 Q140 84 166 79 L160 92 Q142 99 132 112 Z" fill="#ffffff" opacity="0.30"/>
+
+                <!-- hood highlight -->
+                <path d="M286 123 Q313 127 325 147 L320 153 Q304 135 276 129 Z" fill="url(#hoodG)" opacity="0.9"/>
+
+                <!-- body character lines -->
+                <path d="M80 150 Q172 142 300 150" stroke="#ffffff" stroke-width="2" fill="none" opacity="0.55"/>
+                <path d="M82 157 Q174 150 300 157" stroke="#9aa0a8" stroke-width="1" fill="none" opacity="0.5"/>
+
+                <!-- door seams + handles -->
+                <path d="M150 117 L150 178" stroke="#a9aeb7" stroke-width="1" opacity="0.6"/>
+                <path d="M196 114 L196 178" stroke="#a9aeb7" stroke-width="1" opacity="0.6"/>
+                <rect x="158" y="141" width="14" height="3.4" rx="1.7" fill="#969ca4"/>
+                <rect x="206" y="140" width="14" height="3.4" rx="1.7" fill="#969ca4"/>
+
+                <!-- side mirror -->
+                <path d="M213 109 q12 -7 21 -2 q-2 7 -13 8 q-8 0 -8 -6 Z" fill="url(#bodyG)" stroke="#aeb4bd" stroke-width="1"/>
+
+                <!-- headlight + grille + intake -->
+                <path d="M300 128 Q323 132 327 149 L320 151 Q310 138 296 134 Z" fill="url(#lampG)" stroke="#bccfe2" stroke-width="0.8"/>
+                <path d="M301 131 Q318 135 323 147" stroke="#7fb4e6" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+                <path d="M300 153 Q316 153 322 159 L320 167 Q306 163 298 161 Z" fill="#393c42"/>
+                <path d="M285 168 Q306 171 318 165 L316 175 Q300 181 282 179 Z" fill="#cdd1d7"/>
+                <circle cx="300" cy="172" r="2.3" fill="#eaeff4"/>
+
+                <!-- rear wheel -->
+                <g>
+                    <circle cx="112" cy="184" r="29" fill="#1b1d21"/>
+                    <circle cx="112" cy="184" r="28" fill="none" stroke="#2c2f35" stroke-width="2"/>
+                    <circle cx="112" cy="184" r="19" fill="url(#rimG)"/>
+                    <g fill="#c6cad0">
+                        <rect x="109.5" y="167" width="5" height="15" rx="2.5"/>
+                        <rect x="109.5" y="167" width="5" height="15" rx="2.5" transform="rotate(72 112 184)"/>
+                        <rect x="109.5" y="167" width="5" height="15" rx="2.5" transform="rotate(144 112 184)"/>
+                        <rect x="109.5" y="167" width="5" height="15" rx="2.5" transform="rotate(216 112 184)"/>
+                        <rect x="109.5" y="167" width="5" height="15" rx="2.5" transform="rotate(288 112 184)"/>
+                    </g>
+                    <circle cx="112" cy="184" r="6" fill="#80858d"/>
+                    <circle cx="112" cy="184" r="2.4" fill="#5c616a"/>
+                </g>
+
+                <!-- front wheel -->
+                <g>
+                    <circle cx="256" cy="184" r="31" fill="#1b1d21"/>
+                    <circle cx="256" cy="184" r="30" fill="none" stroke="#2c2f35" stroke-width="2"/>
+                    <circle cx="256" cy="184" r="20" fill="url(#rimG)"/>
+                    <g fill="#c6cad0">
+                        <rect x="253.5" y="165" width="5" height="16" rx="2.5"/>
+                        <rect x="253.5" y="165" width="5" height="16" rx="2.5" transform="rotate(72 256 184)"/>
+                        <rect x="253.5" y="165" width="5" height="16" rx="2.5" transform="rotate(144 256 184)"/>
+                        <rect x="253.5" y="165" width="5" height="16" rx="2.5" transform="rotate(216 256 184)"/>
+                        <rect x="253.5" y="165" width="5" height="16" rx="2.5" transform="rotate(288 256 184)"/>
+                    </g>
+                    <circle cx="256" cy="184" r="6.5" fill="#80858d"/>
+                    <circle cx="256" cy="184" r="2.6" fill="#5c616a"/>
+                </g>
+            </svg>`;
+        const TIRE_SVG = `
+            <svg width="60" height="96" viewBox="0 0 60 96">
+                <rect x="18" y="10" width="24" height="76" rx="11" fill="#eef0f3" stroke="#dcdee2"/>
+                <rect x="10" y="16" width="9" height="20" rx="3" fill="#cfd2d6"/><rect x="41" y="16" width="9" height="20" rx="3" fill="#cfd2d6"/>
+                <rect x="10" y="60" width="9" height="20" rx="3" fill="#cfd2d6"/><rect x="41" y="60" width="9" height="20" rx="3" fill="#cfd2d6"/>
+            </svg>`;
+        const SIGNAL_BARS = [7, 9, 11, 13].map((h) => `<span style="height:${h}px"></span>`).join("");
+
+        const SHELL = `
+        <div class="app-shell">
+            <div class="status-bar">
+                <div class="status-left">
+                    <span class="gear-p">P</span>
+                    <span class="prnd"><span class="on">P</span><span>R</span><span>N</span><span>D</span></span>
+                    <span class="range-chip"><i class="fa-solid fa-charging-station"></i><span id="rangeChip">500km</span>
+                        <span class="mini-batt" style="--p:92%"><span class="tip"></span></span></span>
+                    <span class="headlight"><span class="lamp"></span>‹O O›</span>
+                </div>
+                <div class="status-right">
+                    <i class="fa-solid fa-volume-high"></i>
+                    <span class="avatar">운</span>
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <i class="fa-solid fa-bell"></i>
+                    <i class="fa-brands fa-bluetooth-b"></i>
+                    <i class="fa-solid fa-wifi"></i>
+                    <i class="fa-solid fa-gear" id="statusGear" title="설정"></i>
+                    <span class="signal">5G<span class="bars">${SIGNAL_BARS}</span></span>
+                    <span class="status-time" id="clock">오후 3:45</span>
+                </div>
+            </div>
+
+            <div class="dashboard-main">
+                <div class="vehicle-panel">
+                    <div class="car-stage">
+                        <div class="car-tag tag-charge">충전구<small>닫힘</small><span class="dot"></span></div>
+                        <div class="car-tag tag-mirror">사이드미러<small>펴짐</small><span class="dot" style="background:var(--green)"></span></div>
+                        <div class="car-tag tag-trunk">트렁크<small>닫힘</small><span class="dot"></span></div>
+                        ${CAR_SVG}
+                    </div>
+                    <div class="lock-row">
+                        <div class="lock-info">
+                            <div class="lock-toggle" id="lockToggle"><div class="knob"><i class="fa-solid fa-lock"></i></div></div>
+                            <div class="lock-label">도어 잠금<small id="lockLabel">잠김</small></div>
+                        </div>
+                        <div class="lock-km">0km</div>
+                    </div>
+                    <div class="tire-card">
+                        <div class="tire-title">타이어 공기압</div>
+                        <div class="tire-layout">
+                            <div class="tire-val l">29<small>psi</small></div>
+                            ${TIRE_SVG}
+                            <div class="tire-val r">29<small>psi</small></div>
+                            <div class="tire-val l">29<small>psi</small></div><span></span><div class="tire-val r">29<small>psi</small></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="app-column">
+                    <div class="app-frame">
+                        <div class="app-notch"></div>
+                        <div class="app-body">
+                            <div class="app-head"><div class="app-brand">HyConnect</div><i class="fa-solid fa-sliders app-gear" id="appGear" title="설정"></i></div>
+                            <div class="gauge">
+                                <span class="lbl">수소</span>
+                                <span class="track"><span class="fill" id="gaugeFill"></span></span>
+                                <span class="pct" id="gaugePct">100%</span>
+                                <span class="km" id="gaugeKm">500km</span>
+                            </div>
+                            <div id="centerDynamic" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:14px"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="map-panel">
+                    <div class="map-container">
+                        <canvas id="mapCanvas"></canvas>
+                        <div class="map-overlay-dist" id="mapDist"></div>
+                        <div id="mapDyn"></div>
+                        <div class="loc-pill">수정구 시흥동</div>
+                    </div>
+                    <div class="map-search">
+                        <div class="q"><i class="fa-solid fa-magnifying-glass"></i>
+                            <input id="mapSearch" placeholder="어디로 갈까요?" />
+                        </div>
+                        <div class="shorts">
+                            <i class="fa-solid fa-house"></i><i class="fa-solid fa-building"></i><i class="fa-solid fa-star"></i>
+                            <span class="charge"><i class="fa-solid fa-bolt"></i></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="climate-bar">
+                <div class="cl-group"><i class="fa-solid fa-chair"></i><i class="fa-solid fa-fire"></i><span class="seg">‹ <span class="v">OFF</span> ›</span></div>
+                <div class="cl-center"><i class="fa-solid fa-location-arrow"></i><i class="fa-solid fa-table-cells-large"></i><div class="play"><i class="fa-solid fa-play"></i></div><i class="fa-brands fa-android"></i><i class="fa-solid fa-camera"></i></div>
+                <div class="cl-group"><span class="seg">‹ <span class="v">OFF</span> ›</span><i class="fa-solid fa-snowflake"></i><i class="fa-solid fa-fan"></i></div>
+            </div>
+
+            <div class="overlay" id="settingsOverlay"></div>
+            <div class="overlay" id="waypointOverlay"></div>
+        </div>`;
+
+        // ===================== 운전 점수 / 충전소 카드 빌더 =====================
+        function fmtMinutes(min) { const h = Math.floor(min / 60), m = min % 60; return `${h}시간 ${m}분`; }
+        function habitGrade(s) {
+            return s >= 90 ? { label: "안전 주행 습관", color: "#15c463" }
+                : s >= 75 ? { label: "보통 주행 습관", color: "#2b6cff" }
+                : s >= 60 ? { label: "주의 필요", color: "#ff9f1c" }
+                : { label: "공격적 주행", color: "#ff4d4f" };
+        }
+        function habitInfo(s) {
+            return s >= 90 ? { t: "최고의 주행 습관", d: "지금처럼 안전하게 운전해 주세요." }
+                : s >= 75 ? { t: "양호한 주행", d: "조금만 더 부드럽게 운전하면 점수가 올라가요." }
+                : s >= 60 ? { t: "주의가 필요해요", d: "급가속·급정거를 줄이면 점수가 올라가요." }
+                : { t: "공격적인 주행", d: "부드러운 가·감속이 연비와 안전에 도움이 돼요." };
+        }
+        function habitChip(label, count) {
+            return el("div", { class: "mc" }, el("div", { class: "l" }, label), el("div", { class: "v" }, String(count), el("small", null, "회")));
+        }
+        function drivingHabitCard() {
+            const dh = state.drivingHabit, g = habitGrade(dh.avg_score), info = habitInfo(dh.avg_score);
+            return el("div", { class: "habit-card" },
+                el("div", { class: "habit-head" },
+                    el("div", { class: "t" }, "주행 습관 점수"),
+                    el("button", { class: "habit-reset", onClick: resetHabit, html: '<i class="fa-solid fa-rotate-left"></i> 기록 초기화' })),
+                el("div", { class: "habit-score" },
+                    el("div", { class: "big" }, String(dh.avg_score), el("small", null, "점")),
+                    el("div", { class: "grade", style: { color: g.color } }, g.label)),
+                el("div", { class: "habit-sub" }, `최근 ${dh.total_sessions}회 · 누적 ${fmtMinutes(dh.total_driving_minutes)} 주행 분석`),
+                el("div", { class: "habit-level" },
+                    el("div", { class: "hl-top" },
+                        el("span", { class: "l" }, "누적 주행 포인트"),
+                        el("span", { class: "lv" }, "Lv." + dh.level)),
+                    el("div", { class: "hl-mid" },
+                        el("div", null,
+                            el("span", { class: "hl-points" }, won(dh.points), el("small", null, "P")),
+                            el("span", { class: "hl-gain" }, "이번 주행 +" + dh.last_gain + "P")),
+                        el("span", { class: "lt" }, dh.level_title)),
+                    el("div", { class: "hl-bar" }, el("span", { class: "f", style: { width: Math.round(dh.level_progress * 100) + "%" } })),
+                    el("div", { class: "hl-foot" }, "다음 레벨까지 " + won(dh.next_level_remain) + "P")),
+                el("div", { class: "habit-info" },
+                    el("span", { class: "ic" }, "i"),
+                    el("div", null, el("div", { class: "it" }, info.t), el("div", { class: "id" }, info.d))),
+                el("div", { class: "habit-metrics" },
+                    habitChip("급가속", dh.harsh_accel_count),
+                    habitChip("급정거", dh.harsh_brake_count),
+                    habitChip("부주의", dh.incautious_count)));
+        }
+
+        function centerState(icon, text, opts) {
+            opts = opts || {};
+            return el("div", { class: "center-state" + (opts.error ? " error" : "") },
+                el("i", { class: "fa-solid " + icon, style: opts.color ? { color: opts.color } : null }),
+                el("p", null, text));
+        }
+
+        // ===== 잔량 충분 화면 =====
+        function sufficientView(data) {
+            const ai = data.ai_insight || {}, st = data.recommended_station;
+            const metrics = (ai.metrics && ai.metrics.length) ? ai.metrics : [];
+            const status = ai.status || "sufficient";
+            const statusLabel = SUF_LABEL[status] || ai.status_label || "수소 잔량 충분";
+            const title = SUF_TITLE[status] || ai.subtitle || "지금 충전이 급하지 않아요";
+            const desc = status === "sufficient"
+                ? `현재 주행 패턴이라면 약 ${Math.round(state.range)}km 더 주행할 수 있어요. 충전은 급하지 않으니, 이동 경로상 가장 저렴한 충전소를 미리 봐 두는 걸 추천해요.`
+                : (ai.message || "");
+
+            const insight = el("div", { class: "insight-card" },
+                el("div", { class: "insight-head" },
+                    el("span", { class: "insight-status" }, el("span", { class: "dot" }), statusLabel),
+                    el("span", { class: "insight-time" }, "14:30 업데이트")),
+                el("div", { class: "insight-title" }, title),
+                el("div", { class: "insight-desc" }, desc));
+            if (metrics.length) {
+                const row = el("div", { class: "metric-row" });
+                metrics.slice(0, 3).forEach((m) => {
+                    const ok = (m.value === "정상" || m.value === "좋음");
+                    row.appendChild(el("div", { class: "metric-chip" },
+                        el("div", { class: "m-l" }, m.label),
+                        el("div", { class: "m-v" + (ok ? " ok" : "") },
+                            String(m.value).replace(/\.0$/, ""),
+                            m.unit ? el("small", null, m.unit) : null)));
+                });
+                insight.appendChild(row);
+            }
+
+            const scroll = el("div", { class: "app-scroll" }, drivingHabitCard(), insight);
+            if (st) {
+                const saveDiff = (st.price_diff_from_avg != null && st.price_diff_from_avg < 0)
+                    ? el("div", { class: "c-save" }, `평균 대비 ${won(Math.abs(Math.round(st.price_diff_from_avg)))}원 저렴`) : null;
+                scroll.appendChild(el("div", { class: "price-card" },
+                    el("div", { class: "badge-row" },
+                        el("span", { class: "badge fill" }, st.badge || "근처 최저가"),
+                        el("span", { class: "badge outline" }, st.realtime_price === false ? "예상 가격" : "실시간 가격"),
+                        el("span", { class: "badge open" }, st.is_open ? "영업 중" : "영업 종료")),
+                    el("div", { class: "ps-name" }, st.name),
+                    el("div", { class: "ps-addr" }, st.road_nm_addr || "주소 정보 없음"),
+                    el("div", { class: "ps-metrics" },
+                        psMetric("거리", num(st.distance_km) + "km"),
+                        psMetric("예상 도착", (st.eta_minutes != null ? st.eta_minutes : etaMin(st.distance_km)) + "분"),
+                        psMetric("대기", (st.wait_vhcle_alge || 0) + "대")),
+                    el("div", { class: "ps-cost" },
+                        el("div", null,
+                            el("div", { class: "c-unit-l" }, "수소 단가"),
+                            el("div", { class: "c-unit-v" }, (won(st.ntsl_pc) || "-") + "원/kg"),
+                            saveDiff),
+                        el("div", null,
+                            el("div", { class: "c-total-l", style: { textAlign: "right" } }, "예상 충전 비용"),
+                            el("div", { class: "c-total-v" }, (won(st.estimated_cost) || "-") + "원")))));
+            }
+
+            const cta = el("button", { class: "cta", onClick: () => {
+                if (!st) return;
+                openWaypoint({ mno: st.chrstn_mno, name: st.name, addr: st.road_nm_addr, lat: st.let, lon: st.lon, meta: `${num(st.distance_km)}km · 대기 ${st.wait_vhcle_alge || 0}대` });
+            } }, "경로 안내 시작");
+
+            return [scroll, cta];
+        }
+        function psMetric(label, value) {
+            return el("div", { class: "ps-metric" }, el("div", { class: "pm-l" }, label), el("div", { class: "pm-v" }, value));
+        }
+
+        // ===== 충전 필요 화면 =====
+        function needsChargeView() {
+            const stations = state.stations;
+            const rec = stations.find((s) => s.isRecommended) || stations[0];
+            const alertBox = el("div", { class: "alert-box" },
+                el("div", { class: "ic" }, el("i", { class: "fa-solid fa-exclamation" })),
+                el("div", null,
+                    el("div", { class: "a-title" }, `충전이 필요합니다 · 주행가능 ${state.range}km`),
+                    el("div", { class: "a-sub" }, rec ? `${rec.name}을(를) 추천해요. 대기 약 ${rec.waitMinutes}분.` : "주변 충전소를 탐색하세요.")));
+
+            const listEl = el("div", { class: "st-list" });
+            stations.forEach((s) => {
+                const open = (s.status || "").includes("운영") || (s.status || "").includes("정상");
+                listEl.appendChild(el("div", { class: "st-row" },
+                    el("div", { class: "st-pin" + (s.isRecommended ? " rec" : "") }, el("i", { class: "fa-solid fa-location-dot" })),
+                    el("div", { class: "st-main" },
+                        el("div", { class: "st-name" }, s.name, s.isRecommended ? el("span", { class: "rec-badge" }, "추천") : null),
+                        el("div", { class: "st-addr" }, s.address || "주소 정보 없음"),
+                        el("div", { class: "st-status" },
+                            el("span", { class: "op" }, open ? "운영중" : "운영중지"),
+                            el("span", { class: "sep" }, "·"),
+                            el("span", { class: "pr" }, s.pressureInfo || "700bar"))),
+                    el("div", { class: "st-right" },
+                        el("div", { class: "st-dist" }, num(s.distanceKm) + "km"),
+                        el("div", { class: "st-wait" }, "대기 " + s.waitMinutes + "분")),
+                    el("button", { class: "st-add-btn", onClick: () => openWaypoint({ mno: s.id, name: s.name, addr: s.address, lat: s.latitude, lon: s.longitude, meta: `${num(s.distanceKm)}km · 대기 ${s.waitMinutes}분 · ${s.pressureInfo || ""}` }) }, "경유지 추가")));
+            });
+
+            const listCard = el("div", { class: "list-card" },
+                el("div", { class: "list-head" },
+                    el("div", null, el("div", { class: "lh-title" }, "추천 충전소"), el("div", { class: "lh-sub" }, "현재 위치 기준")),
+                    el("button", { class: "refresh-btn", title: "새로고침", disabled: state.status === "loading", onClick: handleRefresh },
+                        el("i", { class: "fa-solid fa-arrows-rotate" + (state.status === "loading" ? " spin" : "") }))),
+                listEl);
+
+            return [alertBox, listCard];
+        }
+
+        // ===================== 렌더 =====================
+        function renderCenter() {
+            const range = state.range;
+            const pct = Math.min(100, Math.round((range / MAX_RANGE) * 100));
+            const isNearest = range >= NEAREST_RANGE_THRESHOLD;
+            const loading = state.status === "loading";
+            let fill = "var(--blue)"; if (pct <= 20) fill = "#ff4d4f"; else if (pct <= 45) fill = "#ff9f1c";
+
+            ui.gaugeFill.style.width = pct + "%"; ui.gaugeFill.style.background = fill;
+            ui.gaugePct.textContent = pct + "%"; ui.gaugePct.style.color = fill;
+            ui.gaugeKm.textContent = range + "km";
+
+            let body;
+            if (loading) body = [centerState("fa-circle-notch fa-spin", "최적의 충전소를 탐색하는 중...", { color: "var(--blue)" })];
+            else if (state.error) body = [centerState("fa-circle-exclamation", state.error, { error: true })];
+            else if (isNearest && state.nearest) body = sufficientView(state.nearest);
+            else if (!isNearest && state.stations.length > 0) body = needsChargeView();
+            else body = [centerState("fa-gas-pump", "새로고침을 눌러 최적의 충전소를 찾아보세요.", { color: "#d8dade" })];
+
+            ui.centerDynamic.replaceChildren.apply(ui.centerDynamic, body);
+        }
+
+        function drawMap() {
+            const canvas = ui.canvas; if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+            const rect = canvas.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            const w = rect.width, h = rect.height;
+            ctx.fillStyle = "#e8eaed"; ctx.fillRect(0, 0, w, h);
+            ctx.strokeStyle = "rgba(0,0,0,0.03)"; ctx.lineWidth = 1;
+            for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+            for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+            const [curLat, curLon] = state.cur, [destLat, destLon] = state.dest;
+            const directDist = haversine(curLat, curLon, destLat, destLon);
+            const autoAlpha = directDist * AUTO_ALPHA_RATIO;
+            const radius = directDist + autoAlpha;
+            const cosLat = Math.cos(curLat * Math.PI / 180);
+            const minLat = Math.min(curLat, destLat) - autoAlpha / 111, maxLat = Math.max(curLat, destLat) + autoAlpha / 111;
+            const minLon = Math.min(curLon, destLon) - autoAlpha / (111 * cosLat), maxLon = Math.max(curLon, destLon) + autoAlpha / (111 * cosLat);
+            const latSpan = (maxLat - minLat) || 0.01, lonSpan = (maxLon - minLon) || 0.01;
+            const toXY = (lat, lon) => ({ x: 50 + (lon - minLon) / lonSpan * (w - 100), y: h - (50 + (lat - minLat) / latSpan * (h - 100)) });
+            const c = toXY(curLat, curLon), d = toXY(destLat, destLon);
+
+            const edge = toXY(curLat, curLon + radius / (111 * cosLat));
+            const cR = Math.abs(edge.x - c.x);
+            ctx.beginPath(); ctx.arc(c.x, c.y, cR, 0, 2 * Math.PI); ctx.strokeStyle = "rgba(43,108,255,0.15)"; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.fillStyle = "rgba(43,108,255,0.04)"; ctx.fill();
+            const rEdge = toXY(curLat, curLon + state.range / (111 * cosLat));
+            const rR = Math.abs(rEdge.x - c.x);
+            ctx.beginPath(); ctx.arc(c.x, c.y, rR, 0, 2 * Math.PI); ctx.strokeStyle = "rgba(255,77,79,0.25)"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+
+            (state.allStations || []).forEach((st) => {
+                const lat = st.let != null ? parseFloat(st.let) : st.lat;
+                const lon = st.lon != null ? parseFloat(st.lon) : st.lng;
+                if (!lat || !lon) return;
+                const p = toXY(lat, lon);
+                const inside = haversine(curLat, curLon, lat, lon) <= radius;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI); ctx.fillStyle = inside ? "#19b6a6" : "#c4c7cd"; ctx.fill();
+                ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
+            });
+
+            ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+
+            const wp = state.waypoint;
+            if (state.nav && wp && wp.lat != null && wp.lon != null) {
+                const w2 = toXY(parseFloat(wp.lat), parseFloat(wp.lon));
+                ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(w2.x, w2.y); ctx.lineTo(d.x, d.y);
+                ctx.strokeStyle = "#2b6cff"; ctx.lineWidth = 4; ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.stroke();
+                ctx.beginPath(); ctx.arc(w2.x, w2.y, 10, 0, 2 * Math.PI); ctx.fillStyle = "#2b6cff"; ctx.fill();
+                ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
+            }
+            ctx.beginPath(); ctx.arc(c.x, c.y, 10, 0, 2 * Math.PI); ctx.fillStyle = "#2b6cff"; ctx.fill();
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
+            ctx.beginPath(); ctx.arc(c.x, c.y, 4, 0, 2 * Math.PI); ctx.fillStyle = "#fff"; ctx.fill();
+            ctx.beginPath(); ctx.arc(d.x, d.y, 8, 0, 2 * Math.PI); ctx.fillStyle = "#ff9500"; ctx.fill();
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5; ctx.stroke();
+
+            ui.mapDist.textContent = `직선거리 ${directDist.toFixed(1)} km`;
+        }
+
+        function renderMapOverlays() {
+            const nodes = [];
+            if (state.countdown != null) {
+                nodes.push(el("div", { class: "nav-countdown" },
+                    el("div", null,
+                        el("div", { class: "nc-sub" }, "경유지 경로 안내"),
+                        el("div", { class: "nc-name" }, state.waypoint ? state.waypoint.name : "-")),
+                    el("button", { onClick: startNavNow }, el("span", { class: "num" }, state.countdown), "안내 시작")));
+            }
+            if (state.nav) {
+                nodes.push(el("div", { class: "nav-banner", html: `<i class="fa-solid fa-route"></i> 안내 중 · ${state.waypoint ? state.waypoint.name : ""} 경유` }));
+            }
+            ui.mapDyn.replaceChildren.apply(ui.mapDyn, nodes);
+        }
+        function renderMap() { drawMap(); renderMapOverlays(); }
+
+        function renderLog() {
+            ui.terminal.innerHTML = state.logs.map((l) => `<div class="ln">${l}</div>`).join("");
+            ui.terminal.scrollTop = ui.terminal.scrollHeight;
+        }
+
+        // ===================== 설정 모달 =====================
+        function buildSettings() {
+            const sheet = el("div", { class: "sheet" });
+            sheet.appendChild(el("h2", null,
+                el("span", { html: '<i class="fa-solid fa-gear"></i> 시뮬레이션 설정' }),
+                el("button", { class: "x", onClick: closeSettings }, el("i", { class: "fa-solid fa-xmark" }))));
+
+            // 사용자 프로필
+            sheet.appendChild(el("div", { class: "sec-t" }, "사용자 프로필"));
+            const userSel = el("select", { onChange: (e) => onUserChange(Number(e.target.value)) });
+            USER_OPTIONS.forEach((u) => userSel.appendChild(el("option", { value: u.id }, u.label)));
+            userSel.value = state.userId;
+            ui.userSel = userSel;
+            sheet.appendChild(el("div", { class: "row" }, el("span", { class: "lab", html: '<i class="fa-solid fa-user"></i>시뮬레이션 사용자' }), userSel));
+
+            // 가중치
+            sheet.appendChild(el("div", { class: "sec-t" }, "개인 선호 가중치"));
+            ui.weightInputs = {}; ui.weightVals = {};
+            WEIGHT_FIELDS.forEach(([k, lbl, ic, mn, mx, stp]) => {
+                const valSpan = el("span", { class: "sval" }, Number(state.weights[k]).toFixed(2));
+                const input = el("input", { type: "range", min: mn, max: mx, step: stp, value: state.weights[k],
+                    onInput: (e) => { state.weights[k] = parseFloat(e.target.value); valSpan.textContent = Number(state.weights[k]).toFixed(2); } });
+                ui.weightInputs[k] = input; ui.weightVals[k] = valSpan;
+                sheet.appendChild(el("div", { class: "row" }, el("span", { class: "lab", html: `<i class="fa-solid ${ic}"></i>${lbl}` }), input, valSpan));
+            });
+            sheet.appendChild(el("button", { class: "sbtn secondary", onClick: savePreferences, html: '<i class="fa-solid fa-floppy-disk"></i> 가중치 DB 저장' }));
+
+            // 주행 시나리오
+            sheet.appendChild(el("div", { class: "sec-t" }, "주행 시나리오"));
+            const presetGrid = el("div", { class: "preset-grid" });
+            ui.presetBtns = [];
+            PRESETS.forEach((p, i) => {
+                const b = el("button", { class: state.presetIdx === i ? "active" : "", onClick: () => applyPreset(i) }, p.label);
+                ui.presetBtns.push(b); presetGrid.appendChild(b);
+            });
+            sheet.appendChild(presetGrid);
+
+            const coordGrid = el("div", { class: "coord-grid" });
+            ui.coord = {};
+            const coordDefs = [
+                ["curLat", "현재 위도", () => state.cur[0], (v) => { state.cur = [v, state.cur[1]]; }],
+                ["curLon", "현재 경도", () => state.cur[1], (v) => { state.cur = [state.cur[0], v]; }],
+                ["destLat", "목적지 위도", () => state.dest[0], (v) => { state.dest = [v, state.dest[1]]; }],
+                ["destLon", "목적지 경도", () => state.dest[1], (v) => { state.dest = [state.dest[0], v]; }],
+            ];
+            coordDefs.forEach(([key, lbl, get, set]) => {
+                const input = el("input", { class: "ci", type: "number", step: "0.0001", value: get(),
+                    onChange: (e) => { set(+e.target.value); renderMap(); scheduleRefresh(); } });
+                ui.coord[key] = input;
+                coordGrid.appendChild(el("div", null, el("div", { class: "ci-l" }, lbl), input));
+            });
+            sheet.appendChild(coordGrid);
+
+            const rangeVal = el("span", { class: "sval" }, state.range + " km");
+            const rangeInput = el("input", { type: "range", min: 10, max: MAX_RANGE, step: 5, value: state.range,
+                onInput: (e) => setRange(Number(e.target.value)) });
+            ui.rangeSlider = rangeInput; ui.rangeVal = rangeVal;
+            sheet.appendChild(el("div", { class: "row", style: { marginTop: "10px" } },
+                el("span", { class: "lab", html: '<i class="fa-solid fa-gauge-high"></i>주행가능거리' }), rangeInput, rangeVal));
+
+            // 주행 습관 (메인 대시보드 상단 카드)
+            sheet.appendChild(el("div", { class: "sec-t" }, "주행 습관 (메인 대시보드 상단 카드)"));
+            ui.habitInputs = {}; ui.habitVals = {};
+            HABIT_FIELDS.forEach(([k, lbl, ic, mn, mx, stp, suf]) => {
+                const valSpan = el("span", { class: "sval" }, state.drivingHabit[k] + suf);
+                const input = el("input", { type: "range", min: mn, max: mx, step: stp, value: state.drivingHabit[k],
+                    onInput: (e) => { state.drivingHabit[k] = Number(e.target.value); valSpan.textContent = state.drivingHabit[k] + suf; renderCenter(); } });
+                ui.habitInputs[k] = input; ui.habitVals[k] = valSpan;
+                sheet.appendChild(el("div", { class: "row" }, el("span", { class: "lab", html: `<i class="fa-solid ${ic}"></i>${lbl}` }), input, valSpan));
+            });
+
+            // Gemini 필터
+            sheet.appendChild(el("div", { class: "sec-t" }, "Gemini 지능형 검색 필터"));
+            const aiToggle = el("input", { type: "checkbox", onChange: (e) => { state.aiEnabled = e.target.checked; ui.nlInput.style.display = state.aiEnabled ? "" : "none"; scheduleRefresh(); } });
+            aiToggle.checked = state.aiEnabled;
+            const toggleLabel = el("label", { class: "toggle" }, aiToggle, el("span", { class: "tk" }));
+            sheet.appendChild(el("div", { class: "row" }, el("span", { class: "lab", html: '<i class="fa-solid fa-brain"></i>AI 자연어 필터' }), toggleLabel));
+            const nlInput = el("input", { class: "nl-input", placeholder: "예: 인천에 있고 세차장이 있는 저렴한 충전소", value: state.nlQuery,
+                onInput: (e) => { state.nlQuery = e.target.value; } });
+            nlInput.style.display = state.aiEnabled ? "" : "none";
+            ui.nlInput = nlInput;
+            sheet.appendChild(nlInput);
+
+            const terminal = el("div", { class: "terminal" });
+            ui.terminal = terminal;
+            sheet.appendChild(terminal);
+
+            sheet.appendChild(el("button", { class: "sbtn primary", onClick: () => { closeSettings(); handleRefresh(); }, html: '<i class="fa-solid fa-magnifying-glass"></i> 최적의 경유지 탐색 시작' }));
+
+            ui.settingsOverlay.replaceChildren(sheet);
+            ui.settingsOverlay.addEventListener("click", (e) => { if (e.target === ui.settingsOverlay) closeSettings(); });
+            renderLog();
+        }
+        function openSettings() { state.settingsOpen = true; ui.settingsOverlay.classList.add("open"); }
+        function closeSettings() { state.settingsOpen = false; ui.settingsOverlay.classList.remove("open"); }
+
+        // 설정 입력값을 현재 state로 동기화 (외부 변경 반영)
+        function syncWeightInputs() {
+            WEIGHT_FIELDS.forEach(([k]) => { if (ui.weightInputs) { ui.weightInputs[k].value = state.weights[k]; ui.weightVals[k].textContent = Number(state.weights[k]).toFixed(2); } });
+        }
+        function syncHabitInputs() {
+            HABIT_FIELDS.forEach(([k, , , , , , suf]) => { if (ui.habitInputs && ui.habitInputs[k]) { ui.habitInputs[k].value = state.drivingHabit[k]; ui.habitVals[k].textContent = state.drivingHabit[k] + suf; } });
+        }
+        function resetHabit() {
+            if (!confirm("주행 습관 기록을 초기화할까요?")) return;
+            Object.assign(state.drivingHabit, {
+                total_sessions: 0, total_driving_minutes: 0, harsh_accel_count: 0, harsh_brake_count: 0,
+                incautious_count: 0, avg_score: 100, points: 0, last_gain: 0, level: 1,
+                level_title: "새내기 드라이버", next_level_remain: 500, level_progress: 0,
+            });
+            syncHabitInputs(); renderCenter();
+            log("주행 습관 기록을 초기화했습니다.", "success");
+        }
+
+        // ===================== 경유지 모달 =====================
+        function openWaypoint(wp) {
+            state.pendingWp = wp;
+            const card = wp ? el("div", { class: "wp-card" },
+                el("div", { class: "n" }, wp.name),
+                el("div", { class: "a" }, wp.addr || "주소 정보 없음"),
+                el("div", { class: "m" }, wp.meta)) : null;
+            const sheet = el("div", { class: "sheet", style: { width: "420px" } },
+                el("div", { class: "sec-t", style: { marginTop: 0 } }, "경유지 추가"),
+                el("h2", { style: { fontSize: "18px", display: "block", marginBottom: "4px" } }, "이 충전소를 경유지로 추가할까요?"),
+                card,
+                el("div", { class: "wp-actions" },
+                    el("button", { class: "sbtn secondary", style: { marginTop: 0 }, onClick: closeWaypoint }, "취소"),
+                    el("button", { class: "sbtn primary", style: { marginTop: 0 }, onClick: confirmWaypoint, html: '<i class="fa-solid fa-location-dot"></i> 경유지 추가' })));
+            ui.waypointOverlay.replaceChildren(sheet);
+            ui.waypointOverlay.classList.add("open");
+        }
+        function closeWaypoint() { state.pendingWp = null; ui.waypointOverlay.classList.remove("open"); }
+        function confirmWaypoint() {
+            const wp = state.pendingWp; if (!wp) return;
+            state.waypoint = wp; state.pendingWp = null;
+            ui.waypointOverlay.classList.remove("open");
+            pushWaypoint(wp.mno);
+            startCountdown(wp);
+        }
+
+        // ===================== 상태 변경 setter =====================
+        function setRange(v) {
+            state.range = v;
+            ui.rangeChip.textContent = v + "km";
+            if (ui.rangeSlider) ui.rangeSlider.value = v;
+            if (ui.rangeVal) ui.rangeVal.textContent = v + " km";
+            renderCenter(); renderMap(); scheduleRefresh();
+        }
+        function applyPreset(i) {
+            state.presetIdx = i;
+            state.cur = PRESETS[i].cur.slice();
+            state.dest = PRESETS[i].dest.slice();
+            if (ui.presetBtns) ui.presetBtns.forEach((b, idx) => b.classList.toggle("active", idx === i));
+            if (ui.coord) {
+                ui.coord.curLat.value = state.cur[0]; ui.coord.curLon.value = state.cur[1];
+                ui.coord.destLat.value = state.dest[0]; ui.coord.destLon.value = state.dest[1];
+            }
+            renderMap(); scheduleRefresh();
+        }
+
+        // ===================== 네비게이션 =====================
+        function clearNav() {
+            state.nav = false; state.waypoint = null; state.countdown = null;
+            if (cdTimer) { clearInterval(cdTimer); cdTimer = null; }
+            renderMap();
+        }
+        function startCountdown(wp) {
+            if (cdTimer) clearInterval(cdTimer);
+            state.nav = false; state.countdown = 5;
+            renderMap();
+            let n = 5;
+            cdTimer = setInterval(() => {
+                n -= 1;
+                if (n <= 0) { clearInterval(cdTimer); cdTimer = null; state.countdown = null; state.nav = true; log("경유지 경로 안내를 시작합니다.", "success"); }
+                else state.countdown = n;
+                renderMap();
+            }, 1000);
+        }
+        function startNavNow() {
+            if (cdTimer) { clearInterval(cdTimer); cdTimer = null; }
+            state.countdown = null; state.nav = true; renderMap();
+        }
+
+        // ===================== API 호출 =====================
+        async function handleRefresh() {
+            clearNav();
+            state.status = "loading"; state.error = null; state.stations = []; state.nearest = null;
+            renderCenter();
+            const range = state.range;
+            const pct = Math.min(100, Math.round((range / MAX_RANGE) * 100));
+            const useNearest = range >= NEAREST_RANGE_THRESHOLD;
+            const nl = state.aiEnabled && state.nlQuery ? state.nlQuery : null;
+            try {
+                if (useNearest) {
+                    const payload = { vehicle: { fuel_percent: pct, remaining_range: range, fuel_type: "hydrogen" }, location: { let: state.cur[0], lon: state.cur[1] }, context: { radius_km: 10 } };
+                    inspect("요청 POST /nearest-recommendation", payload, SCHEMA.nearestReq, {}, log);
+                    const res = await fetch("/nearest-recommendation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                    if (!res.ok) throw new Error(`요청 실패 (${res.status})`);
+                    const data = await res.json();
+                    inspect("응답 /nearest-recommendation", data, SCHEMA.nearestRes, {}, log);
+                    if (data && data.recommended_station) inspect("응답 recommended_station", data.recommended_station, SCHEMA.nearestStationRes, {}, log);
+                    state.nearest = data; log("잔량 충분 · 최저가 추천 완료", "success");
+                } else {
+                    // 목적지를 함께 보내면 경로 우회 필터로 후보가 과도하게 줄어 1건만 남는다.
+                    // UI 라벨/Pleos 동작에 맞춰 목적지를 생략해 주변 충전소를 모두 받는다.
+                    const payload = { user_id: state.userId, current_latitude: state.cur[0], current_longitude: state.cur[1], remaining_range: range, nl_query: nl };
+                    inspect("요청 POST /recommendations/personalized/delivery-payloads", payload, SCHEMA.deliveryReq, { forbidExtra: true }, log);
+                    const res = await fetch("/recommendations/personalized/delivery-payloads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                    if (!res.ok) throw new Error(`요청 실패 (${res.status})`);
+                    const data = await res.json();
+                    inspectList("응답 delivery-payloads", data, SCHEMA.stationCardRes, log);
+                    state.stations = Array.isArray(data) ? data : [];
+                    if (!data || data.length === 0) state.error = "매칭되는 충전소가 없습니다.";
+                    else log(`${data.length}개 충전소 최적화 완료`, "success");
+                }
+            } catch (e) {
+                state.error = e.message || "네트워크 오류";
+                log(`요청 실패: ${e.message}`, "warning");
+            } finally {
+                state.status = "done";
+                renderCenter(); renderMap();
+            }
+        }
+
+        async function loadAllStations() {
+            try {
+                const res = await fetch("/hydrogen-stations?limit=1000");
+                if (res.ok) {
+                    const d = await res.json();
+                    inspectList("응답 GET /hydrogen-stations", d, SCHEMA.stationRes, log);
+                    state.allStations = d; renderMap();
+                    log(`Supabase 활성 충전소 ${d.length}개 로드`, "success");
+                } else log("DB 연결 실패. 데모 데이터를 사용합니다.", "warning");
+            } catch (_) { log("네트워크 오류. 데모 데이터를 사용합니다.", "warning"); }
+        }
+
+        async function onUserChange(id) {
+            state.userId = id;
+            state.weights = Object.assign({}, USER_PRESETS[id] || USER_PRESETS[1]);
+            if (ui.userSel) ui.userSel.value = id;
+            syncWeightInputs();
+            try {
+                const res = await fetch(`/users/${id}/preferences`);
+                if (res.ok) {
+                    const d = await res.json();
+                    inspect("응답 GET preferences", d, SCHEMA.prefRes, {}, log);
+                    state.weights = { weight_price: d.weight_price, weight_waiting_time: d.weight_waiting_time, weight_distance: d.weight_distance, weight_facilities: d.weight_facilities, safety_margin: d.safety_margin };
+                    syncWeightInputs();
+                    log("DB 사용자 가중치 로드 완료", "success");
+                }
+            } catch (_) { log("가중치 로드 실패. 로컬 프리셋 사용.", "warning"); }
+            scheduleRefresh();
+        }
+
+        async function savePreferences() {
+            try {
+                inspect("요청 PUT /users/{id}/preferences", state.weights, SCHEMA.prefReq, {}, log);
+                const res = await fetch(`/users/${state.userId}/preferences`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state.weights) });
+                if (res.ok) {
+                    const u = await res.json();
+                    inspect("응답 PUT preferences", u, SCHEMA.prefRes, {}, log);
+                    log("가중치 DB 저장 완료", "success"); alert("가중치 설정이 저장되었습니다!");
+                } else log(`저장 실패 (${res.status})`, "warning");
+            } catch (_) { log("네트워크 오류로 저장 실패.", "warning"); }
+        }
+
+        async function pushWaypoint(mno) {
+            if (!mno) return;
+            try {
+                const body = { chrstn_mno: mno };
+                inspect("요청 POST /users/{id}/preferences/learn", body, SCHEMA.learnReq, {}, log);
+                const res = await fetch(`/users/${state.userId}/preferences/learn`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+                if (res.ok) {
+                    const u = await res.json();
+                    inspect("응답 preferences/learn", u, SCHEMA.prefRes, {}, log);
+                    state.weights = { weight_price: u.weight_price, weight_waiting_time: u.weight_waiting_time, weight_distance: u.weight_distance, weight_facilities: u.weight_facilities, safety_margin: u.safety_margin };
+                    syncWeightInputs();
+                    log("선택 학습 완료. 가중치 업데이트됨.", "success");
+                } else log(`학습 실패 (${res.status})`, "warning");
+            } catch (_) { log("학습 네트워크 오류.", "warning"); }
+        }
+
+        // ===================== 시계 / 도어 잠금 =====================
+        function startClock() {
+            const tick = () => {
+                const d = new Date(), h = d.getHours();
+                ui.clock.textContent = `${h < 12 ? "오전" : "오후"} ${h % 12 || 12}:${String(d.getMinutes()).padStart(2, "0")}`;
+            };
+            tick(); setInterval(tick, 30000);
+        }
+
+        // ===================== 초기화 =====================
+        function init() {
+            const root = document.getElementById("root");
+            root.innerHTML = SHELL;
+
+            ui.rangeChip = document.getElementById("rangeChip");
+            ui.clock = document.getElementById("clock");
+            ui.gaugeFill = document.getElementById("gaugeFill");
+            ui.gaugePct = document.getElementById("gaugePct");
+            ui.gaugeKm = document.getElementById("gaugeKm");
+            ui.centerDynamic = document.getElementById("centerDynamic");
+            ui.canvas = document.getElementById("mapCanvas");
+            ui.mapDist = document.getElementById("mapDist");
+            ui.mapDyn = document.getElementById("mapDyn");
+            ui.settingsOverlay = document.getElementById("settingsOverlay");
+            ui.waypointOverlay = document.getElementById("waypointOverlay");
+
+            document.getElementById("statusGear").addEventListener("click", openSettings);
+            document.getElementById("appGear").addEventListener("click", openSettings);
+            ui.waypointOverlay.addEventListener("click", (e) => { if (e.target === ui.waypointOverlay) closeWaypoint(); });
+
+            const lockToggle = document.getElementById("lockToggle");
+            const lockLabel = document.getElementById("lockLabel");
+            let locked = true;
+            lockToggle.addEventListener("click", () => {
+                locked = !locked;
+                lockToggle.classList.toggle("off", !locked);
+                lockToggle.querySelector(".knob i").className = "fa-solid " + (locked ? "fa-lock" : "fa-lock-open");
+                lockLabel.textContent = locked ? "잠김" : "열림";
+            });
+
+            const mapSearch = document.getElementById("mapSearch");
+            mapSearch.addEventListener("keydown", (e) => { if (e.key === "Enter") handleRefresh(); });
+
+            buildSettings();
+            startClock();
+            window.addEventListener("resize", drawMap);
+
+            renderCenter();
+            renderMap();
+            loadAllStations();
+            handleRefresh();
+
+            window.__appMounted = true;
+        }
+
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+        else init();
+    })();
+    </script>
+</body>
+</html>
