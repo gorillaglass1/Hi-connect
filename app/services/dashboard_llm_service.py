@@ -59,10 +59,6 @@ class DashboardLlmService:
             except Exception as exc:  # pragma: no cover - 방어적
                 logger.error("Gemini Client 초기화 실패: %s", exc)
 
-    @property
-    def available(self) -> bool:
-        return self.client is not None
-
     async def generate(
         self, context: dict, tip_catalog: list[dict]
     ) -> LlmInsight | None:

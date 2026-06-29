@@ -52,9 +52,3 @@ class HydrogenStationAdditionalInfoResponse(HydrogenStationAdditionalInfoCreate)
     updated_at: datetime | None = Field(default=None)
 
     model_config = ConfigDict(from_attributes=True)
-
-class HydrogenStationAdditionalInfoWithStationResponse(
-    HydrogenStationAdditionalInfoResponse
-):
-    chrstn_nm: str | None = Field(default=None)
-    road_nm_addr: str | None = Field(default=None)

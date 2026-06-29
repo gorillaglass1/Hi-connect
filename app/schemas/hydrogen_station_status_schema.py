@@ -39,6 +39,3 @@ class HydrogenStationStatusResponse(HydrogenStationStatusCreate):
     updated_at: datetime | None = Field(default=None)
 
     model_config = ConfigDict(from_attributes=True)
-
-class HydrogenStationStatusWithNameResponse(HydrogenStationStatusResponse):
-    chrstn_nm: str | None = Field(default=None)
