@@ -53,7 +53,6 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="app/src/assets"), name="static")
 app.include_router(hydrogen_station_router)
 app.include_router(hydrogen_station_status_router)
 app.include_router(hydrogen_station_facilities_router)
