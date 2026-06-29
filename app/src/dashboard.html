@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< HEAD
     <title>HyConnect | Pleos Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
@@ -1236,3 +1237,2244 @@
     </script>
 </body>
 </html>
+=======
+    <title>Hy-Connect | Pleos Infotainment Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+
+        body {
+            background: #000;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #1d1d1f;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== TOP STATUS BAR ===== */
+        .status-bar {
+            /* background: #1c1c1e;  (기존: 검은 배경) */
+            /* color: #fff; */
+            background: #ffffff;               /* 변경: 흰 배경 */
+            color: #1d1d1f;                    /* 변경: 어두운 글자 */
+            border-bottom: 1px solid #e5e5ea;  /* 추가: 본문(#f2f2f7)과 경계 */
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            flex-shrink: 0;
+            z-index: 50;
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .gear-indicator {
+            font-size: 28px;
+            font-weight: 800;
+            /* color: #fff; */
+            color: #1d1d1f;   /* 변경: 흰 배경 대비 */
+            letter-spacing: -1px;
+        }
+
+        .gear-labels {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #636366;
+            letter-spacing: 2px;
+        }
+
+        .gear-labels .active { /* color: #fff; */ color: #1d1d1f; }
+
+        .range-display {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            /* color: #fff; */
+            color: #1d1d1f;   /* 변경 */
+        }
+
+        .range-display .km-value {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .battery-icon {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .battery-icon .bar {
+            width: 22px;
+            height: 11px;
+            /* border: 1.5px solid #fff; */
+            border: 1.5px solid #3a3a3c;   /* 변경: 흰 배경 대비 */
+            border-radius: 2px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .battery-icon .bar::after {
+            content: '';
+            position: absolute;
+            left: 1px; top: 1px; bottom: 1px;
+            width: var(--fuel-pct, 28%);
+            background: #30d158;
+            border-radius: 1px;
+            transition: width 0.4s ease;
+        }
+
+        .battery-icon .tip {
+            width: 3px;
+            height: 5px;
+            /* background: #fff; */
+            background: #3a3a3c;   /* 변경 */
+            border-radius: 0 1px 1px 0;
+        }
+
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 13px;
+            /* color: #aeaeb2; */
+            color: #3a3a3c;   /* 변경: 어두운 아이콘 */
+        }
+
+        .status-right i { font-size: 14px; }
+        .status-right .time { /* color: #fff; */ color: #1d1d1f; font-weight: 600; font-size: 14px; }
+
+        /* ===== MAIN 3-COLUMN LAYOUT ===== */
+        .dashboard-main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 340px 1fr 1fr;
+            min-height: 0;
+            background: #f2f2f7;
+        }
+
+        /* ===== LEFT PANEL: VEHICLE STATUS ===== */
+        .vehicle-panel {
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e5e5ea;
+            overflow-y: auto;
+        }
+
+        .car-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 20px 10px;
+            position: relative;
+            min-height: 300px;
+        }
+
+        /* Car SVG illustration */
+        .car-illustration {
+            width: 240px;
+            height: 140px;
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .car-illustration svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Car annotation tags */
+        .car-tag {
+            position: absolute;
+            font-size: 10px;
+            font-weight: 600;
+            color: #8e8e93;
+            background: #f2f2f7;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #e5e5ea;
+            white-space: nowrap;
+        }
+
+        .car-tag::before {
+            content: '';
+            position: absolute;
+            width: 1px;
+            height: 20px;
+            background: #d1d1d6;
+        }
+
+        .tag-mirror { top: 40px; left: -10px; }
+        .tag-mirror::before { right: -1px; top: 100%; }
+        .tag-charge { top: 10px; right: -10px; }
+        .tag-charge::before { left: -1px; top: 100%; }
+        .tag-trunk { top: 40px; right: -20px; }
+        .tag-trunk::before { left: -1px; top: 100%; }
+
+        .car-shadow {
+            width: 180px;
+            height: 20px;
+            background: radial-gradient(ellipse, rgba(0,0,0,0.08) 0%, transparent 70%);
+            margin-top: -5px;
+        }
+
+        /* Lock/status controls */
+        .vehicle-controls {
+            padding: 12px 20px 20px;
+        }
+
+        .lock-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+        }
+
+        .lock-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .lock-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #34c759;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .lock-icon.unlocked { background: #ff9500; }
+
+        .lock-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+
+        .lock-label small {
+            display: block;
+            font-size: 11px;
+            font-weight: 400;
+            color: #8e8e93;
+        }
+
+        .lock-km {
+            font-size: 14px;
+            font-weight: 600;
+            color: #8e8e93;
+        }
+
+        .tire-pressure {
+            background: #f9f9f9;
+            border: 1px solid #e5e5ea;
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-top: 8px;
+        }
+
+        .tire-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 10px;
+        }
+
+        .tire-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 20px;
+        }
+
+        .tire-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #3a3a3c;
+            font-weight: 500;
+        }
+
+        .tire-item i {
+            font-size: 11px;
+            color: #8e8e93;
+        }
+
+        /* ===== CENTER PANEL: MYCONNECT WIDGET ===== */
+        .myconnect-panel {
+            background: #f2f2f7;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 20px;
+            gap: 16px;
+        }
+
+        .myconnect-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .myconnect-brand {
+            font-size: 11px;
+            color: #8e8e93;
+            font-weight: 500;
+        }
+
+        .myconnect-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1d1d1f;
+            margin-top: 2px;
+        }
+
+        .myconnect-subtitle {
+            font-size: 12px;
+            color: #8e8e93;
+            margin-top: 4px;
+        }
+
+        .myconnect-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mc-btn {
+            padding: 7px 14px;
+            border-radius: 18px;
+            font-size: 12px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+
+        .mc-btn-primary {
+            background: #007aff;
+            color: #fff;
+        }
+
+        .mc-btn-primary:hover { background: #0066d6; }
+
+        .mc-btn-secondary {
+            background: #e5e5ea;
+            color: #3a3a3c;
+        }
+
+        .mc-btn-secondary:hover { background: #d1d1d6; }
+
+        /* Fuel gauge card */
+        .fuel-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .fuel-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #8e8e93;
+            margin-bottom: 8px;
+        }
+
+        .fuel-row {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+        }
+
+        .fuel-percentage {
+            font-size: 42px;
+            font-weight: 800;
+            color: #34c759;
+            line-height: 1;
+        }
+
+        .fuel-percentage span {
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .fuel-battery-visual {
+            width: 100px;
+            height: 48px;
+            border: 2.5px solid #d1d1d6;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .fuel-battery-visual::after {
+            content: '';
+            position: absolute;
+            right: -8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 5px;
+            height: 16px;
+            background: #d1d1d6;
+            border-radius: 0 3px 3px 0;
+        }
+
+        .fuel-battery-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #a8e063, #56ab2f);
+            border-radius: 5px;
+            transition: width 0.5s ease;
+        }
+
+        .fuel-hint {
+            font-size: 11px;
+            color: #8e8e93;
+            margin-top: 10px;
+        }
+
+        .fuel-hint strong { color: #3a3a3c; }
+
+        /* Timing card */
+        .timing-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 18px 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .timing-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1d1d1f;
+            margin-bottom: 4px;
+        }
+
+        .timing-desc {
+            font-size: 12px;
+            color: #8e8e93;
+            margin-bottom: 12px;
+        }
+
+        .timing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .timing-bars {
+            display: flex;
+            gap: 3px;
+            flex: 1;
+        }
+
+        .timing-bars .bar {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #e5e5ea;
+        }
+
+        .timing-bars .bar.active { background: #007aff; }
+
+        .timing-badge {
+            background: #007aff;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Recommended station card */
+        .rec-section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1d1d1f;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .rec-section-title .tag-new {
+            background: #ff3b30;
+            color: #fff;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .station-rec-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 16px 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .rec-station-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .rec-pin {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #007aff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .rec-station-info {
+            flex: 1;
+        }
+
+        .rec-station-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1d1d1f;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .rec-station-name .open-badge {
+            background: #34c759;
+            color: #fff;
+            font-size: 9px;
+            padding: 1px 6px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .rec-station-meta {
+            font-size: 11px;
+            color: #8e8e93;
+            margin-top: 2px;
+        }
+
+        .rec-station-details {
+            font-size: 11px;
+            color: #8e8e93;
+        }
+
+        .rec-distance-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #f2f2f7;
+        }
+
+        .rec-distance {
+            font-size: 18px;
+            font-weight: 700;
+            color: #007aff;
+        }
+
+        .rec-distance small {
+            font-size: 11px;
+            color: #8e8e93;
+            font-weight: 400;
+            margin-left: 4px;
+        }
+
+        .rec-wait {
+            font-size: 12px;
+            color: #8e8e93;
+        }
+
+        .btn-route {
+            background: #007aff;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 18px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-route:hover { background: #0066d6; }
+
+        .more-link {
+            text-align: right;
+            margin-top: 8px;
+        }
+
+        .more-link a {
+            font-size: 12px;
+            color: #007aff;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        /* Station list in scrollable container */
+        .station-scroll {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 280px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .station-scroll::-webkit-scrollbar { width: 4px; }
+        .station-scroll::-webkit-scrollbar-thumb { background: #d1d1d6; border-radius: 2px; }
+
+        /* Loading & empty states */
+        .loading-state, .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #8e8e93;
+        }
+
+        .loading-state i, .empty-state i {
+            font-size: 2rem;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        /* ===== RIGHT PANEL: MAP NAVIGATION ===== */
+        .map-panel {
+            background: #f2f2f7;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+            background: #e8e8ed;
+            overflow: hidden;
+        }
+
+        #mapCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .map-pin-label {
+            position: absolute;
+            font-size: 11px;
+            font-weight: 600;
+            color: #3a3a3c;
+            pointer-events: none;
+        }
+
+        /* Floating search bar */
+        .map-search-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-input-wrap {
+            flex: 1;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 14px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .search-input-wrap i {
+            color: #8e8e93;
+            font-size: 14px;
+        }
+
+        .search-input-wrap input {
+            flex: 1;
+            border: none;
+            background: none;
+            outline: none;
+            font-size: 14px;
+            font-family: inherit;
+            color: #1d1d1f;
+        }
+
+        .search-input-wrap input::placeholder {
+            color: #aeaeb2;
+        }
+
+        .search-shortcuts {
+            display: flex;
+            gap: 6px;
+        }
+
+        .search-shortcut {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            color: #3a3a3c;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .search-shortcut:hover { background: #fff; }
+
+        /* ===== BOTTOM CLIMATE BAR ===== */
+        .climate-bar {
+            background: #1c1c1e;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .climate-section {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .climate-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: #aeaeb2;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .climate-icon:hover { color: #fff; background: rgba(255,255,255,0.1); }
+        .climate-icon.active { color: #007aff; }
+
+        .climate-divider {
+            width: 1px;
+            height: 28px;
+            background: #38383a;
+            margin: 0 8px;
+        }
+
+        .climate-temp {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #aeaeb2;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .climate-temp .arrow {
+            cursor: pointer;
+            padding: 2px 4px;
+        }
+
+        .climate-temp .value {
+            color: #fff;
+            font-size: 15px;
+        }
+
+        /* ===== SETTINGS MODAL ===== */
+        .settings-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .settings-overlay.open { display: flex; }
+
+        .settings-sheet {
+            background: #fff;
+            border-radius: 20px;
+            width: 480px;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 28px;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.2);
+            animation: sheetUp 0.3s ease;
+        }
+
+        @keyframes sheetUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .settings-header h2 {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .settings-close {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #e5e5ea;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: #636366;
+        }
+
+        .settings-close:hover { background: #d1d1d6; }
+
+        .settings-section {
+            margin-bottom: 20px;
+        }
+
+        .settings-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #8e8e93;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f2f2f7;
+        }
+
+        .setting-row:last-child { border-bottom: none; }
+
+        .setting-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1d1d1f;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .setting-label i {
+            color: #8e8e93;
+            font-size: 13px;
+            width: 16px;
+            text-align: center;
+        }
+
+        .setting-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: #007aff;
+            min-width: 40px;
+            text-align: right;
+        }
+
+        .setting-row input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 120px;
+            height: 4px;
+            background: #e5e5ea;
+            border-radius: 2px;
+            outline: none;
+            margin: 0 10px;
+        }
+
+        .setting-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border: 1.5px solid #d1d1d6;
+            border-radius: 50%;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            cursor: pointer;
+        }
+
+        .setting-row select {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid #d1d1d6;
+            font-family: inherit;
+            font-size: 13px;
+            color: #1d1d1f;
+            background: #f9f9f9;
+            outline: none;
+        }
+
+        .preset-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .preset-chip {
+            padding: 6px 12px;
+            border-radius: 14px;
+            font-size: 12px;
+            font-weight: 500;
+            background: #f2f2f7;
+            color: #3a3a3c;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-chip:hover { background: #e5e5ea; }
+        .preset-chip.active { background: #007aff; color: #fff; }
+
+        .scenario-grid {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .scenario-chip {
+            padding: 6px 12px;
+            border-radius: 14px;
+            font-size: 12px;
+            font-weight: 500;
+            background: #f2f2f7;
+            color: #3a3a3c;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .scenario-chip:hover { background: #e5e5ea; }
+        .scenario-chip.active { background: #1d1d1f; color: #fff; }
+
+        .coord-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .coord-input {
+            padding: 8px 10px;
+            border: 1px solid #d1d1d6;
+            border-radius: 10px;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+
+        .coord-input:focus { border-color: #007aff; }
+
+        .coord-label {
+            font-size: 11px;
+            color: #8e8e93;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .settings-btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .settings-btn-primary {
+            background: #007aff;
+            color: #fff;
+        }
+
+        .settings-btn-primary:hover { background: #0066d6; }
+
+        .settings-btn-secondary {
+            background: #f2f2f7;
+            color: #1d1d1f;
+        }
+
+        .settings-btn-secondary:hover { background: #e5e5ea; }
+
+        /* AI toggle in settings */
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 26px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input { display: none; }
+
+        .toggle-track {
+            width: 100%;
+            height: 100%;
+            background: #e5e5ea;
+            border-radius: 13px;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch input:checked + .toggle-track {
+            background: #34c759;
+        }
+
+        .toggle-track::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: #fff;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch input:checked + .toggle-track::after {
+            transform: translateX(18px);
+        }
+
+        /* Terminal log in settings */
+        .terminal-card {
+            background: #1c1c1e;
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 11px;
+            color: #98989d;
+        }
+
+        .terminal-card::-webkit-scrollbar { width: 3px; }
+        .terminal-card::-webkit-scrollbar-thumb { background: #48484a; border-radius: 2px; }
+
+        .terminal-line { margin-bottom: 3px; line-height: 1.5; }
+
+        /* AI NL prompt in settings */
+        .nl-input-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .nl-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d1d1d6;
+            border-radius: 10px;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+        }
+
+        .nl-input:focus { border-color: #007aff; }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1100px) {
+            .dashboard-main {
+                grid-template-columns: 1fr;
+            }
+            .vehicle-panel { display: none; }
+            .status-bar { padding: 0 12px; }
+        }
+
+        /* Scrollbar styling for panels */
+        .myconnect-panel::-webkit-scrollbar,
+        .vehicle-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .myconnect-panel::-webkit-scrollbar-thumb,
+        .vehicle-panel::-webkit-scrollbar-thumb {
+            background: #d1d1d6;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP STATUS BAR -->
+    <div class="status-bar">
+        <div class="status-left">
+            <span class="gear-indicator">P</span>
+            <div class="gear-labels">
+                <span class="active">P</span><span>R</span><span>N</span><span>D</span>
+            </div>
+            <div class="range-display">
+                <span class="km-value" id="rangeKmDisplay">45km</span>
+                <div class="battery-icon">
+                    <div class="bar" id="statusBattery" style="--fuel-pct: 28%"></div>
+                    <div class="tip"></div>
+                </div>
+            </div>
+        </div>
+        <div class="status-right">
+            <i class="fa-solid fa-volume-high"></i>
+            <i class="fa-solid fa-circle-user"></i>
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <i class="fa-solid fa-bell"></i>
+            <i class="fa-solid fa-bluetooth-b"></i>
+            <i class="fa-solid fa-wifi"></i>
+            <!-- 추가: 설정 진입 톱니바퀴 (가운데 설정 버튼에서 이전). 클릭 시 기존 openSettings() 호출 -->
+            <i class="fa-solid fa-gear" onclick="openSettings()" style="cursor:pointer;" title="설정"></i>
+            <span class="time" id="clockDisplay">오전 9:19</span>
+        </div>
+    </div>
+
+    <!-- MAIN 3-COLUMN LAYOUT -->
+    <div class="dashboard-main">
+        <!-- LEFT: VEHICLE STATUS -->
+        <div class="vehicle-panel">
+            <div class="car-view">
+                <div class="car-illustration">
+                    <span class="car-tag tag-mirror">사이드미러<br><small style="color:#34c759;font-weight:700">퍼짐</small></span>
+                    <span class="car-tag tag-charge">충전구<br><small style="color:#8e8e93;font-weight:700">닫힘</small></span>
+                    <span class="car-tag tag-trunk">트렁크<br><small style="color:#8e8e93;font-weight:700">닫힘</small></span>
+                    <!-- Car SVG -->
+                    <svg viewBox="0 0 300 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Car body -->
+                        <ellipse cx="150" cy="130" rx="120" ry="6" fill="#e5e5ea" opacity="0.6"/>
+                        <path d="M60 95 Q65 60 110 55 L190 55 Q235 60 240 95 Z" fill="#c7c7cc" stroke="#aeaeb2" stroke-width="1"/>
+                        <rect x="45" y="90" rx="12" width="210" height="38" fill="#d1d1d6" stroke="#aeaeb2" stroke-width="1"/>
+                        <!-- Windshields -->
+                        <path d="M78 92 Q82 65 115 60 L145 58 L145 92 Z" fill="#b0cfe0" opacity="0.6" stroke="#aeaeb2" stroke-width="0.5"/>
+                        <path d="M222 92 Q218 65 185 60 L155 58 L155 92 Z" fill="#b0cfe0" opacity="0.6" stroke="#aeaeb2" stroke-width="0.5"/>
+                        <!-- Wheels -->
+                        <circle cx="95" cy="124" r="14" fill="#636366" stroke="#48484a" stroke-width="2"/>
+                        <circle cx="95" cy="124" r="6" fill="#aeaeb2"/>
+                        <circle cx="205" cy="124" r="14" fill="#636366" stroke="#48484a" stroke-width="2"/>
+                        <circle cx="205" cy="124" r="6" fill="#aeaeb2"/>
+                        <!-- Headlights -->
+                        <rect x="42" y="96" width="14" height="8" rx="3" fill="#ffcc02" opacity="0.7"/>
+                        <rect x="244" y="96" width="14" height="8" rx="3" fill="#ff453a" opacity="0.7"/>
+                        <!-- Hyundai H logo -->
+                        <text x="150" y="112" text-anchor="middle" font-size="14" font-weight="800" fill="#8e8e93" font-family="sans-serif">H</text>
+                    </svg>
+                </div>
+                <div class="car-shadow"></div>
+            </div>
+
+            <div class="vehicle-controls">
+                <div class="lock-row">
+                    <div class="lock-info">
+                        <div class="lock-icon" id="lockBtn" onclick="toggleLock()">
+                            <i class="fa-solid fa-lock"></i>
+                        </div>
+                        <div class="lock-label">
+                            도어 잠금
+                            <small id="lockStatus">잠김</small>
+                        </div>
+                    </div>
+                    <div class="lock-km">0km</div>
+                </div>
+
+                <div class="tire-pressure">
+                    <div class="tire-title">타이어 공기압</div>
+                    <div class="tire-grid">
+                        <div class="tire-item"><i class="fa-solid fa-tire"></i> 29 psi</div>
+                        <div class="tire-item"><i class="fa-solid fa-tire"></i> 29 psi</div>
+                        <div class="tire-item"><i class="fa-solid fa-tire"></i> 29 psi</div>
+                        <div class="tire-item"><i class="fa-solid fa-tire"></i> 29 psi</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER: MYCONNECT WIDGET -->
+        <div class="myconnect-panel">
+            <div class="myconnect-header">
+                <div>
+                    <div class="myconnect-brand">MyConnect</div>
+                    <div class="myconnect-title">하이커넥트</div>
+                    <div class="myconnect-subtitle">수소 충전까지 스마트한 최적의 여정을 안내합니다.</div>
+                </div>
+                <div class="myconnect-actions">
+                    <button class="mc-btn mc-btn-primary" onclick="fetchRecommendations()">
+                        <i class="fa-solid fa-bolt-lightning"></i> 충전 추천
+                    </button>
+                    <!-- 설정 진입은 상단 status-bar 톱니바퀴로 이전. 기존 버튼 주석 처리.
+                    <button class="mc-btn mc-btn-secondary" onclick="openSettings()">
+                        <i class="fa-solid fa-gear"></i> 설정
+                    </button>
+                    -->
+                </div>
+            </div>
+
+            <!-- Fuel Gauge -->
+            <div class="fuel-card">
+                <div class="fuel-label">수소 잔량</div>
+                <div class="fuel-row">
+                    <div class="fuel-percentage" id="fuelPercent">28<span>%</span></div>
+                    <div class="fuel-battery-visual">
+                        <div class="fuel-battery-fill" id="fuelBar" style="width: 28%"></div>
+                    </div>
+                </div>
+                <div class="fuel-hint">
+                    충전 추천 서버 테스트를 위해 임시 차량 상태를 사용합니다.<br>
+                    <strong>예상 주행 가능: <span id="fuelRangeText">45 km</span></strong>
+                </div>
+            </div>
+
+            <!-- Timing card -->
+            <div class="timing-card">
+                <div class="timing-title">지금 충전하기 좋은 타이밍이에요</div>
+                <div class="timing-desc">실시간 충전소 상태와 대기 시간을 기준으로 추천합니다.</div>
+                <div class="timing-indicator">
+                    <div class="timing-bars">
+                        <div class="bar active"></div>
+                        <div class="bar active"></div>
+                        <div class="bar active"></div>
+                        <div class="bar active"></div>
+                        <div class="bar"></div>
+                    </div>
+                    <span class="timing-badge">추천</span>
+                </div>
+            </div>
+
+            <!-- Recommended Stations -->
+            <div class="rec-section-title">
+                추천 충전소
+                <span class="tag-new">새로고침</span>
+            </div>
+
+            <div id="loadingIndicator" class="loading-state" style="display:none;">
+                <i class="fa-solid fa-circle-notch fa-spin" style="color:#007aff;"></i>
+                <p>당신에게 가장 완벽한 경로를 설계하는 중...</p>
+            </div>
+
+            <div id="emptyMessage" class="empty-state">
+                <i class="fa-solid fa-gas-pump" style="color:#d1d1d6;"></i>
+                <p>충전 추천 버튼을 눌러 최적의 충전소를 찾아보세요.</p>
+            </div>
+
+            <div class="station-scroll" id="recommendationResults">
+                <!-- Dynamic station cards go here -->
+            </div>
+
+            <div class="more-link" id="moreLink" style="display:none;">
+                <a href="#" onclick="openSettings(); return false;">더보기</a>
+            </div>
+        </div>
+
+        <!-- RIGHT: MAP NAVIGATION -->
+        <div class="map-panel">
+            <div class="map-container">
+                <canvas id="mapCanvas"></canvas>
+                <div id="distanceOverlay" style="position:absolute;top:12px;left:12px;font-size:11px;color:#636366;background:rgba(255,255,255,0.85);padding:4px 10px;border-radius:8px;font-weight:500;"></div>
+
+                <!-- NAV COUNTDOWN PANEL (신규: 경유지 추가 후 5초 카운트다운) -->
+                <div id="navCountdownPanel" style="display:none;position:absolute;top:16px;left:50%;transform:translateX(-50%);align-items:center;gap:14px;background:rgba(28,28,30,0.95);backdrop-filter:blur(20px);color:#fff;border-radius:16px;padding:14px 18px;box-shadow:0 8px 30px rgba(0,0,0,0.25);z-index:30;">
+                    <div>
+                        <div style="font-size:11px;color:#aeaeb2;font-weight:500;">경유지 경로 안내</div>
+                        <div id="navCountdownStation" style="font-size:14px;font-weight:700;margin-top:2px;">-</div>
+                    </div>
+                    <button onclick="startNavigation()" style="display:flex;align-items:center;gap:8px;background:#007aff;color:#fff;border:none;border-radius:18px;padding:8px 16px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">
+                        <span id="navCountdownNum" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,0.2);font-size:12px;">5</span>
+                        안내 시작
+                    </button>
+                </div>
+
+                <!-- NAV ACTIVE BANNER (신규: 안내 중 배너) -->
+                <div id="navBanner" style="display:none;position:absolute;bottom:80px;left:16px;background:rgba(0,122,255,0.95);color:#fff;border-radius:12px;padding:8px 14px;font-size:13px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.18);z-index:30;">
+                    <i class="fa-solid fa-route"></i> <span id="navBannerText">안내 중</span>
+                </div>
+            </div>
+
+            <div class="map-search-bar">
+                <div class="search-input-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="aiPromptInput" placeholder="어디로 갈까요?" onkeydown="if(event.key==='Enter'){fetchRecommendations();}">
+                </div>
+                <div class="search-shortcuts">
+                    <div class="search-shortcut" title="집"><i class="fa-solid fa-house"></i></div>
+                    <div class="search-shortcut" title="회사"><i class="fa-solid fa-building"></i></div>
+                    <div class="search-shortcut" title="즐겨찾기"><i class="fa-solid fa-star"></i></div>
+                    <div class="search-shortcut" title="충전소"><i class="fa-solid fa-bolt"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM CLIMATE BAR -->
+    <div class="climate-bar">
+        <div class="climate-section">
+            <div class="climate-icon"><i class="fa-solid fa-fan"></i></div>
+            <div class="climate-temp">
+                <span class="arrow">&lt;</span>
+                <span class="value">OFF</span>
+                <span class="arrow">&gt;</span>
+            </div>
+        </div>
+        <div class="climate-divider"></div>
+        <div class="climate-section">
+            <div class="climate-icon"><i class="fa-solid fa-temperature-low"></i></div>
+            <div class="climate-icon"><i class="fa-solid fa-couch"></i></div>
+        </div>
+        <div class="climate-divider"></div>
+        <div class="climate-section">
+            <div class="climate-icon active"><i class="fa-solid fa-paper-plane"></i></div>
+            <div class="climate-icon"><i class="fa-solid fa-envelope"></i></div>
+            <div class="climate-icon"><i class="fa-solid fa-phone"></i></div>
+            <div class="climate-icon"><i class="fa-solid fa-grip"></i></div>
+            <div class="climate-icon"><i class="fa-solid fa-cloud"></i></div>
+            <div class="climate-icon"><i class="fa-solid fa-mountain-sun"></i></div>
+        </div>
+        <div class="climate-divider"></div>
+        <div class="climate-section">
+            <div class="climate-icon"><i class="fa-solid fa-fan"></i></div>
+            <div class="climate-temp">
+                <span class="arrow">&lt;</span>
+                <span class="value">OFF</span>
+                <span class="arrow">&gt;</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div class="settings-overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
+        <div class="settings-sheet">
+            <div class="settings-header">
+                <h2><i class="fa-solid fa-gear"></i> 시뮬레이션 설정</h2>
+                <button class="settings-close" onclick="closeSettings()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- User Selection -->
+            <div class="settings-section">
+                <div class="settings-section-title">사용자 프로필</div>
+                <div class="setting-row">
+                    <span class="setting-label"><i class="fa-solid fa-user"></i> 시뮬레이션 사용자</span>
+                    <select id="userSelector" onchange="onUserChanged()">
+                        <option value="1">김하나 - 인천 거주자</option>
+                        <option value="2">이도윤 - 경기 출퇴근자</option>
+                        <option value="3">박서준 - 외근 잦은 직장인</option>
+                        <option value="4">최민서 - 가격 초민감자</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Weight Sliders -->
+            <div class="settings-section">
+                <div class="settings-section-title">개인 선호 가중치</div>
+                <div class="setting-row">
+                    <span class="setting-label"><i class="fa-solid fa-won-sign"></i> 가격</span>
+                    <input type="range" id="weightPrice" min="0.0" max="3.0" step="0.1" value="1.0" oninput="updateSliderLabel(this, 'weightPriceVal')">
+                    <span class="setting-value" id="weightPriceVal">1.00</span>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label"><i class="fa-solid fa-clock"></i> 대기시간</span>
+                    <input type="range" id="weightWait" min="0.0" max="3.0" step="0.1" value="1.0" oninput="updateSliderLabel(this, 'weightWaitVal')">
+                    <span class="setting-value" id="weightWaitVal">1.00</span>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label"><i class="fa-solid fa-route"></i> 우회거리</span>
+                    <input type="range" id="weightDistance" min="0.0" max="3.0" step="0.1" value="1.0" oninput="updateSliderLabel(this, 'weightDistanceVal')">
+                    <span class="setting-value" id="weightDistanceVal">1.00</span>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label"><i class="fa-solid fa-shop"></i> 편의시설</span>
+                    <input type="range" id="weightFacilities" min="0.0" max="3.0" step="0.1" value="1.0" oninput="updateSliderLabel(this, 'weightFacilitiesVal')">
+                    <span class="setting-value" id="weightFacilitiesVal">1.00</span>
+                </div>
+                <div class="setting-row">
+                    <span class="setting-label"><i class="fa-solid fa-shield-halved"></i> 안전 계수</span>
+                    <input type="range" id="safetyMargin" min="1.0" max="1.5" step="0.05" value="1.1" oninput="updateSliderLabel(this, 'safetyMarginVal')">
+                    <span class="setting-value" id="safetyMarginVal">1.10</span>
+                </div>
+                <button class="settings-btn settings-btn-secondary" onclick="savePreferences()">
+                    <i class="fa-solid fa-floppy-disk"></i> 가중치 DB 저장
+                </button>
+            </div>
+
+            <!-- Driving Scenario -->
+            <div class="settings-section">
+                <div class="settings-section-title">주행 시나리오</div>
+                <div class="preset-grid">
+                    <div class="preset-chip active" onclick="setPreset(37.4050, 126.7210, 37.4600, 126.4500, 'incheon')">인천시청 → 인천공항</div>
+                    <div class="preset-chip" onclick="setPreset(37.4979, 127.0276, 37.4600, 126.4500, 'seoul-incheon')">강남역 → 인천공항</div>
+                    <div class="preset-chip" onclick="setPreset(37.5665, 126.9780, 37.3910, 127.1120, 'seoul-bundang')">서울시청 → 분당</div>
+                    <div class="preset-chip" onclick="setPreset(37.3910, 126.6510, 37.5665, 126.9780, 'songdo-seoul')">송도 → 서울시청</div>
+                </div>
+                <div class="scenario-grid" style="margin-top:12px;">
+                    <button class="scenario-chip" type="button" onclick="applyDetourScenario('route', this)">경로상 후보 우선</button>
+                    <button class="scenario-chip" type="button" onclick="applyDetourScenario('nearby', this)">가까워도 우회 큼</button>
+                </div>
+
+                <div class="coord-grid" style="margin-top:12px;">
+                    <div><div class="coord-label">현재 위도</div><input class="coord-input" type="number" id="curLat" step="0.0001" value="37.4050" onchange="drawMap()"></div>
+                    <div><div class="coord-label">현재 경도</div><input class="coord-input" type="number" id="curLon" step="0.0001" value="126.7210" onchange="drawMap()"></div>
+                    <div><div class="coord-label">목적지 위도</div><input class="coord-input" type="number" id="destLat" step="0.0001" value="37.4600" onchange="drawMap()"></div>
+                    <div><div class="coord-label">목적지 경도</div><input class="coord-input" type="number" id="destLon" step="0.0001" value="126.4500" onchange="drawMap()"></div>
+                </div>
+
+                <div class="setting-row" style="margin-top:12px;">
+                    <span class="setting-label"><i class="fa-solid fa-gauge-high"></i> 주행가능거리</span>
+                    <input type="range" id="remainingRange" min="10" max="250" step="5" value="45" oninput="updateRange(this)">
+                    <span class="setting-value" id="remainingRangeVal">45 km</span>
+                </div>
+            </div>
+
+            <!-- AI Filter -->
+            <div class="settings-section">
+                <div class="settings-section-title">Gemini 지능형 검색 필터</div>
+                <div class="setting-row">
+                    <span class="setting-label"><i class="fa-solid fa-brain"></i> AI 자연어 필터</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="aiToggle" onchange="onAiToggleChanged()">
+                        <div class="toggle-track"></div>
+                    </label>
+                </div>
+                <div id="aiPromptGroup" style="display:none;">
+                    <div class="nl-input-row">
+                        <input class="nl-input" type="text" id="aiPromptInputModal" placeholder="예: 인천에 있고 세차장이 있는 저렴한 충전소">
+                    </div>
+                </div>
+                <div class="terminal-card" id="terminalLog">
+                    <div class="terminal-line">&gt; Gemini 지능형 번역 엔진이 준비되었습니다.</div>
+                </div>
+            </div>
+
+            <button class="settings-btn settings-btn-primary" onclick="closeSettings(); fetchRecommendations();">
+                <i class="fa-solid fa-magnifying-glass"></i> 최적의 경유지 탐색 시작
+            </button>
+        </div>
+    </div>
+
+    <!-- WAYPOINT CONFIRM MODAL (신규: 경유지 추가 확인 팝업, 기존 설정 모달과 별도) -->
+    <div class="settings-overlay" id="waypointOverlay" onclick="if(event.target===this)closeWaypointModal()">
+        <div class="settings-sheet" style="width:420px;">
+            <div class="settings-section-title" style="margin-bottom:6px;">경유지 추가</div>
+            <h2 style="font-size:18px;font-weight:700;margin-bottom:18px;">현재 경로에 이 충전소를 경유지로 추가할까요?</h2>
+
+            <div class="station-rec-card" style="margin-bottom:20px;">
+                <div class="rec-station-row">
+                    <div class="rec-pin"><i class="fa-solid fa-location-dot"></i></div>
+                    <div class="rec-station-info">
+                        <div class="rec-station-name" id="wpStationName">-</div>
+                        <div class="rec-station-meta" id="wpStationAddr">-</div>
+                        <div class="rec-station-details" id="wpStationMeta">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;">
+                <button class="settings-btn settings-btn-secondary" style="margin-top:0;" onclick="closeWaypointModal()">
+                    취소
+                </button>
+                <button class="settings-btn settings-btn-primary" style="margin-top:0;" onclick="confirmWaypoint()">
+                    <i class="fa-solid fa-location-dot"></i> 경유지 추가
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== GLOBALS =====
+        let stationsList = [];
+        let allStations = [];
+        // 신규: [경유지 추가] 확정 시 선택된 충전소를 저장 (이후 지도 경로 표시 단계로 이어질 자리)
+        let selectedWaypointStation = null;
+        // 신규: 확인 팝업이 떠 있는 동안 보류 중인 충전소 chrstn_mno
+        let pendingWaypointMno = null;
+        // 신규: 경로 안내(내비) 상태 플래그 — drawMap()이 true일 때 경로선을 덧그림
+        let navigationActive = false;
+        // 신규: 5초 카운트다운 setInterval 핸들 (버튼 클릭/자동 시작 시 clearInterval로 중단)
+        let countdownTimer = null;
+        const DASHBOARD_AUTO_ALPHA_RATIO = 0.6;
+        const userPresets = {
+            1: { weight_price: 2.2, weight_waiting_time: 1.5, weight_distance: 1.0, weight_facilities: 0.5, safety_margin: 1.1 },
+            2: { weight_price: 1.0, weight_waiting_time: 1.2, weight_distance: 2.5, weight_facilities: 1.2, safety_margin: 1.1 },
+            3: { weight_price: 1.2, weight_waiting_time: 2.0, weight_distance: 1.5, weight_facilities: 2.0, safety_margin: 1.15 },
+            4: { weight_price: 3.0, weight_waiting_time: 0.5, weight_distance: 0.8, weight_facilities: 0.5, safety_margin: 1.05 }
+        };
+
+        const localDummyStations = [
+            { name: "인천공항 수소충전소", lat: 37.4600, lon: 126.4500, price: 9900, wait: 0 },
+            { name: "인천송도 수소충전소", lat: 37.3910, lon: 126.6510, price: 9700, wait: 2 },
+            { name: "인천남동 수소충전소", lat: 37.4050, lon: 126.7210, price: 10400, wait: 4 },
+            { name: "서울 마포 수소충전소", lat: 37.5705, lon: 126.8810, price: 10500, wait: 1 },
+            { name: "경기 성남 분당 충전소", lat: 37.3910, lon: 127.1120, price: 9900, wait: 0 }
+        ];
+
+        // ===== INIT =====
+        window.onload = function() {
+            updateClock();
+            setInterval(updateClock, 60000);
+            onUserChanged();
+            fetchAllStationsFromDB();
+            syncFuelDisplay();
+        };
+
+        window.addEventListener('resize', drawMap);
+
+        function updateClock() {
+            const now = new Date();
+            const h = now.getHours();
+            const m = now.getMinutes().toString().padStart(2, '0');
+            const period = h < 12 ? '오전' : '오후';
+            const h12 = h % 12 || 12;
+            document.getElementById('clockDisplay').textContent = `${period} ${h12}:${m}`;
+        }
+
+        // ===== SETTINGS MODAL =====
+        function openSettings() {
+            document.getElementById('settingsOverlay').classList.add('open');
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsOverlay').classList.remove('open');
+        }
+
+        // ===== LOCK TOGGLE =====
+        function toggleLock() {
+            const btn = document.getElementById('lockBtn');
+            const icon = btn.querySelector('i');
+            const status = document.getElementById('lockStatus');
+            const isLocked = icon.classList.contains('fa-lock');
+            if (isLocked) {
+                icon.classList.replace('fa-lock', 'fa-lock-open');
+                btn.classList.add('unlocked');
+                status.textContent = '열림';
+            } else {
+                icon.classList.replace('fa-lock-open', 'fa-lock');
+                btn.classList.remove('unlocked');
+                status.textContent = '잠김';
+            }
+        }
+
+        // ===== FUEL/RANGE SYNC =====
+        function syncFuelDisplay() {
+            const range = parseFloat(document.getElementById('remainingRange').value);
+            const maxRange = 600;
+            const pct = Math.min(100, Math.round((range / maxRange) * 100));
+
+            document.getElementById('fuelPercent').innerHTML = `${pct}<span>%</span>`;
+            document.getElementById('fuelBar').style.width = `${pct}%`;
+            document.getElementById('fuelRangeText').textContent = `${range} km`;
+            document.getElementById('rangeKmDisplay').textContent = `${range}km`;
+            document.getElementById('statusBattery').style.setProperty('--fuel-pct', `${pct}%`);
+            document.getElementById('remainingRangeVal').textContent = `${range} km`;
+
+            // Update bar color based on level
+            const bar = document.getElementById('fuelBar');
+            if (pct > 50) bar.style.background = 'linear-gradient(90deg, #a8e063, #56ab2f)';
+            else if (pct > 20) bar.style.background = 'linear-gradient(90deg, #f7c948, #f2a900)';
+            else bar.style.background = 'linear-gradient(90deg, #ff6b6b, #ff3b30)';
+        }
+
+        function updateRange(slider) {
+            syncFuelDisplay();
+            drawMap();
+        }
+
+        // ===== DB FETCH =====
+        async function fetchAllStationsFromDB() {
+            try {
+                const res = await fetch("/hydrogen-stations?limit=1000");
+                if (res.ok) {
+                    allStations = await res.json();
+                    logTerminal(`Supabase에서 활성 수소충전소 ${allStations.length}개 로드 완료`, "success");
+                    drawMap();
+                } else {
+                    logTerminal("DB 연결 실패. 데모 데이터를 사용합니다.", "warning");
+                }
+            } catch (err) {
+                logTerminal("네트워크 오류. 데모 데이터를 사용합니다.", "warning");
+            }
+        }
+
+        // ===== SLIDER HELPERS =====
+        function updateSliderLabel(slider, labelId) {
+            document.getElementById(labelId).innerText = parseFloat(slider.value).toFixed(2);
+        }
+
+        function setSlider(id, valId, val) {
+            const slider = document.getElementById(id);
+            slider.value = val;
+            document.getElementById(valId).innerText = parseFloat(val).toFixed(2);
+        }
+
+        function setRangeValue(id, labelId, value, unit = "") {
+            const slider = document.getElementById(id);
+            slider.value = value;
+            document.getElementById(labelId).innerText = `${value}${unit}`;
+        }
+
+        // ===== AI TOGGLE =====
+        function onAiToggleChanged() {
+            const checked = document.getElementById("aiToggle").checked;
+            document.getElementById("aiPromptGroup").style.display = checked ? "block" : "none";
+            if (checked) {
+                logTerminal("Gemini Text-to-SQL 활성화. 자연어 검색 대기중...");
+            }
+        }
+
+        // ===== TERMINAL LOG =====
+        function logTerminal(message, type = "info") {
+            const term = document.getElementById("terminalLog");
+            let icon = "&gt; ";
+            if (type === "success") icon = "<span style='color:#34c759'>[OK]</span> ";
+            if (type === "warning") icon = "<span style='color:#ff3b30'>[WARN]</span> ";
+            term.innerHTML += `<div class="terminal-line">${icon}${message}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        // ===== PRESET & SCENARIO =====
+        function setPreset(curLat, curLon, destLat, destLon, key) {
+            document.getElementById("curLat").value = curLat;
+            document.getElementById("curLon").value = curLon;
+            document.getElementById("destLat").value = destLat;
+            document.getElementById("destLon").value = destLon;
+
+            const chips = document.querySelectorAll(".preset-chip");
+            chips.forEach(c => c.classList.remove("active"));
+            if (typeof event !== "undefined" && event.target.classList.contains("preset-chip")) {
+                event.target.classList.add("active");
+            }
+            drawMap();
+        }
+
+        async function applyDetourScenario(type, sourceButton) {
+            document.querySelectorAll(".scenario-chip").forEach(c => c.classList.remove("active"));
+            sourceButton.classList.add("active");
+
+            document.getElementById("aiToggle").checked = false;
+            onAiToggleChanged();
+
+            setSlider("weightPrice", "weightPriceVal", 0.4);
+            setSlider("weightWait", "weightWaitVal", 0.4);
+            setSlider("weightDistance", "weightDistanceVal", 3.0);
+            setSlider("weightFacilities", "weightFacilitiesVal", 0.2);
+            setSlider("safetyMargin", "safetyMarginVal", 1.05);
+            document.getElementById("remainingRange").value = 100;
+            syncFuelDisplay();
+
+            if (type === "route") {
+                setPreset(37.4050, 126.7210, 37.4600, 126.4500, "detour-route");
+                logTerminal("Scenario: 경로 방향 충전소 우선 가중.");
+            } else {
+                setPreset(37.5665, 126.9780, 37.3910, 127.1120, "detour-nearby");
+                logTerminal("Scenario: 근거리 충전소의 우회 비용 확인.");
+            }
+            await fetchRecommendations();
+        }
+
+        // ===== USER CHANGE =====
+        async function onUserChanged() {
+            const userId = document.getElementById("userSelector").value;
+            const preset = userPresets[userId] || userPresets[1];
+
+            setSlider("weightPrice", "weightPriceVal", preset.weight_price);
+            setSlider("weightWait", "weightWaitVal", preset.weight_waiting_time);
+            setSlider("weightDistance", "weightDistanceVal", preset.weight_distance);
+            setSlider("weightFacilities", "weightFacilitiesVal", preset.weight_facilities);
+            setSlider("safetyMargin", "safetyMarginVal", preset.safety_margin);
+
+            logTerminal(`User ${userId} 가중치 로딩 중...`);
+
+            try {
+                const res = await fetch(`/users/${userId}/preferences`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setSlider("weightPrice", "weightPriceVal", data.weight_price);
+                    setSlider("weightWait", "weightWaitVal", data.weight_waiting_time);
+                    setSlider("weightDistance", "weightDistanceVal", data.weight_distance);
+                    setSlider("weightFacilities", "weightFacilitiesVal", data.weight_facilities);
+                    setSlider("safetyMargin", "safetyMarginVal", data.safety_margin);
+                    logTerminal(`DB에서 사용자 가중치 로드 완료`, "success");
+                }
+            } catch (err) {
+                logTerminal(`가중치 로드 실패. 로컬 프리셋 사용.`, "warning");
+            }
+        }
+
+        // ===== SAVE PREFERENCES =====
+        async function savePreferences() {
+            const userId = document.getElementById("userSelector").value;
+            const payload = {
+                weight_price: parseFloat(document.getElementById("weightPrice").value),
+                weight_waiting_time: parseFloat(document.getElementById("weightWait").value),
+                weight_distance: parseFloat(document.getElementById("weightDistance").value),
+                weight_facilities: parseFloat(document.getElementById("weightFacilities").value),
+                safety_margin: parseFloat(document.getElementById("safetyMargin").value)
+            };
+
+            logTerminal(`User ${userId} 가중치 저장 중...`);
+
+            try {
+                const res = await fetch(`/users/${userId}/preferences`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    logTerminal(`가중치 DB 저장 완료`, "success");
+                    alert("가중치 설정이 데이터베이스에 저장되었습니다!");
+                } else {
+                    logTerminal(`저장 실패. status: ${res.status}`, "warning");
+                }
+            } catch (err) {
+                logTerminal(`네트워크 오류로 저장 실패.`, "warning");
+            }
+        }
+
+        // ===== HAVERSINE =====
+        function haversineDistFE(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        // ===== DRAW MAP (Light Apple Maps Style) =====
+        function drawMap() {
+            const canvas = document.getElementById("mapCanvas");
+            if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * (window.devicePixelRatio || 1);
+            canvas.height = rect.height * (window.devicePixelRatio || 1);
+            ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+            const w = rect.width;
+            const h = rect.height;
+
+            // Light map background
+            ctx.fillStyle = "#e8e8ed";
+            ctx.fillRect(0, 0, w, h);
+
+            // Subtle grid
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.03)";
+            ctx.lineWidth = 1;
+            for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+            for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+            const curLat = parseFloat(document.getElementById("curLat").value);
+            const curLon = parseFloat(document.getElementById("curLon").value);
+            const destLat = parseFloat(document.getElementById("destLat").value);
+            const destLon = parseFloat(document.getElementById("destLon").value);
+
+            const directDist = haversineDistFE(curLat, curLon, destLat, destLon);
+            const autoAlpha = directDist * DASHBOARD_AUTO_ALPHA_RATIO;
+            const radius = directDist + autoAlpha;
+
+            document.getElementById("distanceOverlay").innerText = `직선거리: ${directDist.toFixed(1)} km`;
+
+            const minLat = Math.min(curLat, destLat) - (autoAlpha/111);
+            const maxLat = Math.max(curLat, destLat) + (autoAlpha/111);
+            const minLon = Math.min(curLon, destLon) - (autoAlpha/(111*Math.cos(curLat*Math.PI/180)));
+            const maxLon = Math.max(curLon, destLon) + (autoAlpha/(111*Math.cos(curLat*Math.PI/180)));
+            const latSpan = maxLat - minLat;
+            const lonSpan = maxLon - minLon;
+
+            function toCanvas(lat, lon) {
+                const pad = 50;
+                return {
+                    x: pad + (lon - minLon) / lonSpan * (w - 2*pad),
+                    y: h - (pad + (lat - minLat) / latSpan * (h - 2*pad))
+                };
+            }
+
+            const curPt = toCanvas(curLat, curLon);
+            const destPt = toCanvas(destLat, destLon);
+
+            // Search circle
+            const lonOff = radius / (111 * Math.cos(curLat*Math.PI/180));
+            const edgePt = toCanvas(curLat, curLon + lonOff);
+            const cRadius = Math.abs(edgePt.x - curPt.x);
+
+            ctx.beginPath();
+            ctx.arc(curPt.x, curPt.y, cRadius, 0, 2*Math.PI);
+            ctx.strokeStyle = "rgba(0, 122, 255, 0.15)";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = "rgba(0, 122, 255, 0.04)";
+            ctx.fill();
+
+            // Range circle
+            const remainRange = parseFloat(document.getElementById("remainingRange").value);
+            const rLonOff = remainRange / (111 * Math.cos(curLat*Math.PI/180));
+            const rEdgePt = toCanvas(curLat, curLon + rLonOff);
+            const rRadius = Math.abs(rEdgePt.x - curPt.x);
+
+            ctx.beginPath();
+            ctx.arc(curPt.x, curPt.y, rRadius, 0, 2*Math.PI);
+            ctx.strokeStyle = "rgba(255, 59, 48, 0.2)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4,4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Stations
+            const stationsToDraw = allStations.length > 0 ? allStations : localDummyStations;
+            stationsToDraw.forEach(st => {
+                const lat = st.let ? parseFloat(st.let) : st.lat;
+                const lon = st.lon ? parseFloat(st.lon) : st.lon;
+                if (!lat || !lon) return;
+
+                const pt = toCanvas(lat, lon);
+                const dist = haversineDistFE(curLat, curLon, lat, lon);
+                const inside = dist <= radius;
+
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 5, 0, 2*Math.PI);
+                ctx.fillStyle = inside ? "#34c759" : "#c7c7cc";
+                ctx.fill();
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.fillStyle = inside ? "#3a3a3c" : "#aeaeb2";
+                ctx.font = "bold 9px 'Pretendard', sans-serif";
+                const name = st.chrstn_nm || st.name;
+                ctx.fillText(name.substring(0, 5), pt.x + 8, pt.y + 3);
+            });
+
+            // Route line
+            ctx.beginPath();
+            ctx.moveTo(curPt.x, curPt.y);
+            ctx.lineTo(destPt.x, destPt.y);
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.08)";
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5,5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Current position
+            ctx.beginPath();
+            ctx.arc(curPt.x, curPt.y, 10, 0, 2*Math.PI);
+            ctx.fillStyle = "#007aff";
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Inner dot
+            ctx.beginPath();
+            ctx.arc(curPt.x, curPt.y, 4, 0, 2*Math.PI);
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+
+            // Destination
+            ctx.beginPath();
+            ctx.arc(destPt.x, destPt.y, 8, 0, 2*Math.PI);
+            ctx.fillStyle = "#ff9500";
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            // Labels
+            ctx.font = "bold 11px 'Pretendard', sans-serif";
+            ctx.fillStyle = "#1d1d1f";
+
+            // Label backgrounds
+            function drawLabel(text, x, y) {
+                const metrics = ctx.measureText(text);
+                const tw = metrics.width + 10;
+                ctx.fillStyle = "rgba(255,255,255,0.9)";
+                ctx.beginPath();
+                ctx.roundRect(x - tw/2, y - 10, tw, 16, 4);
+                ctx.fill();
+                ctx.strokeStyle = "rgba(0,0,0,0.08)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.fillStyle = "#1d1d1f";
+                ctx.fillText(text, x - metrics.width/2, y + 2);
+            }
+
+            drawLabel("현재 위치", curPt.x, curPt.y - 18);
+            drawLabel("목적지", destPt.x, destPt.y - 16);
+
+            // 신규: 안내 중일 때만 경유지 경로를 덧그린다 (resize 등 재호출 후에도 유지).
+            // toCanvas/curPt/destPt를 그대로 넘겨 좌표 변환을 drawMap과 일치시킴.
+            if (navigationActive && selectedWaypointStation) {
+                drawNavigationRoute(ctx, toCanvas, curPt, destPt);
+            }
+        }
+
+        // ===== FETCH RECOMMENDATIONS =====
+        async function fetchRecommendations() {
+            // 신규: 새 추천 검색 시작 시 이전 경유지 경로 안내 상태를 초기화한다.
+            // navigationActive=false + 패널/배너 숨김 + 타이머 정지 + 선택 충전소 null →
+            // 이어지는 drawMap()에서 이전 경로선이 그려지지 않음.
+            navigationActive = false;
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+            const navPanelEl = document.getElementById("navCountdownPanel");
+            if (navPanelEl) navPanelEl.style.display = "none";
+            const navBannerEl = document.getElementById("navBanner");
+            if (navBannerEl) navBannerEl.style.display = "none";
+            selectedWaypointStation = null;
+            drawMap();  // 캔버스를 즉시 다시 그려 이전 경로선을 화면에서 제거 (없으면 다음 drawMap까지 남음)
+
+            const userId = document.getElementById("userSelector").value;
+            const curLat = parseFloat(document.getElementById("curLat").value);
+            const curLon = parseFloat(document.getElementById("curLon").value);
+            const destLat = parseFloat(document.getElementById("destLat").value);
+            const destLon = parseFloat(document.getElementById("destLon").value);
+            const remainingRange = parseFloat(document.getElementById("remainingRange").value);
+            const isAiEnabled = document.getElementById("aiToggle").checked;
+
+            // Get NL query from either search bar or modal input
+            let nlQuery = null;
+            if (isAiEnabled) {
+                nlQuery = document.getElementById("aiPromptInputModal").value || document.getElementById("aiPromptInput").value;
+            } else {
+                // Also check the map search bar for quick searches
+                const searchVal = document.getElementById("aiPromptInput").value;
+                if (searchVal && searchVal.length > 2) nlQuery = searchVal;
+            }
+
+            document.getElementById("loadingIndicator").style.display = "block";
+            document.getElementById("emptyMessage").style.display = "none";
+            document.getElementById("recommendationResults").innerHTML = "";
+            document.getElementById("moreLink").style.display = "none";
+
+            if (nlQuery) {
+                logTerminal(`Gemini 번역 요청: "${nlQuery}"`);
+            }
+
+            const payload = {
+                user_id: parseInt(userId),
+                current_latitude: curLat,
+                current_longitude: curLon,
+                destination_latitude: destLat,
+                destination_longitude: destLon,
+                remaining_range: remainingRange,
+                nl_query: nlQuery
+            };
+
+            try {
+                // 기존: camelCase 응답(HydrogenStationCard)이라 renderStationList의 snake_case 필드와
+                // 불일치하여 카드가 전부 undefined로 렌더됨. snake_case 응답(RecommendedStationResponse)을
+                // 주는 /recommendations/personalized 로 변경.
+                // const res = await fetch("/recommendations/personalized/delivery-payloads", {
+                const res = await fetch("/recommendations/personalized", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                document.getElementById("loadingIndicator").style.display = "none";
+
+                if (res.ok) {
+                    const vehiclePayloads = await res.json();
+                    stationsList = vehiclePayloads;
+
+                    if (vehiclePayloads.length === 0) {
+                        document.getElementById("emptyMessage").style.display = "block";
+                        document.getElementById("emptyMessage").innerHTML = "<i class='fa-solid fa-circle-exclamation' style='font-size:2rem;color:#ff3b30;margin-bottom:10px'></i><br>매칭되는 충전소가 없습니다.";
+                        logTerminal("검색 결과 0건.", "warning");
+                        return;
+                    }
+
+                    logTerminal(`${vehiclePayloads.length}개 충전소 최적화 완료.`, "success");
+                    if (nlQuery) {
+                        logTerminal("Gemini 자연어 → SQL 번역 성공.", "success");
+                    }
+                    renderStationList(vehiclePayloads);
+                } else {
+                    document.getElementById("emptyMessage").style.display = "block";
+                    document.getElementById("emptyMessage").innerText = "API 요청 실패.";
+                    logTerminal(`요청 실패. Code: ${res.status}`, "warning");
+                }
+            } catch (err) {
+                document.getElementById("loadingIndicator").style.display = "none";
+                document.getElementById("emptyMessage").style.display = "block";
+                document.getElementById("emptyMessage").innerText = "네트워크 오류.";
+                logTerminal("API 연결 오류.", "warning");
+            }
+        }
+
+        // ===== RENDER STATION LIST (Pleos Card Style) =====
+        function renderStationList(vehiclePayloads) {
+            const container = document.getElementById("recommendationResults");
+            container.innerHTML = "";
+
+            vehiclePayloads.forEach((vp, idx) => {
+                const openBadge = vp.is_reachable
+                    ? `<span class="open-badge">운영</span>`
+                    : `<span class="open-badge" style="background:#ff9500">주의</span>`;
+
+                const waitText = vp.wait_vehicles > 0
+                    ? `대기 ${vp.wait_vehicles}대 · ${vp.wait_time_minutes}분`
+                    : "대기 없음";
+
+                // 변경: 카드 상세줄의 "700bar 사용 가능"은 하드코딩이었음 →
+                // 응답의 delivery_payload.pressure_info("700bar 사용 가능"/"700bar 사용 불가") 값 사용.
+                const card = `
+                    <div class="station-rec-card">
+                        <div class="rec-station-row">
+                            <div class="rec-pin"><i class="fa-solid fa-location-dot"></i></div>
+                            <div class="rec-station-info">
+                                <div class="rec-station-name">
+                                    ${vp.chrstn_nm} ${openBadge}
+                                </div>
+                                <div class="rec-station-meta">
+                                    ${vp.road_nm_addr || "주소 정보 없음"}
+                                </div>
+                                <div class="rec-station-details">
+                                    OPEN · ${vp.ntsl_pc ? vp.ntsl_pc.toLocaleString()+'원/kg' : '가격정보 없음'} · ${vp.delivery_payload ? vp.delivery_payload.pressure_info : '700bar 정보 없음'}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="rec-distance-row">
+                            <div class="rec-distance">
+                                ${vp.distance_to_station}<small>km</small>
+                            </div>
+                            <div class="rec-wait">${waitText}</div>
+                            <button class="btn-route" data-chrstn-mno="${vp.chrstn_mno}">
+                                경로 안내
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += card;
+            });
+
+            document.getElementById("moreLink").style.display = "block";
+
+            document.querySelectorAll(".btn-route").forEach(btn => {
+                // 기존: 클릭 즉시 학습 호출. 신규: 먼저 확인 팝업을 띄우고, 실제 학습은 팝업의 [경유지 추가] 버튼으로 이동.
+                // btn.addEventListener("click", () => pushWaypoint(btn.dataset.chrstnMno));
+                btn.addEventListener("click", () => openWaypointModal(btn.dataset.chrstnMno));
+            });
+        }
+
+        // ===== WAYPOINT CONFIRM MODAL (신규) =====
+        // btn-route 클릭 시 호출: 학습 API를 바로 부르지 않고 확인 팝업을 띄운다.
+        function openWaypointModal(chrstnMno) {
+            const station = stationsList.find(st => st.chrstn_mno === chrstnMno);
+            if (!station) {
+                logTerminal("선택한 충전소를 찾을 수 없습니다.", "warning");
+                return;
+            }
+            pendingWaypointMno = chrstnMno;
+
+            document.getElementById("wpStationName").textContent = station.chrstn_nm;
+            document.getElementById("wpStationAddr").textContent = station.road_nm_addr || "주소 정보 없음";
+            const pressure = station.delivery_payload ? station.delivery_payload.pressure_info : "700bar 정보 없음";
+            document.getElementById("wpStationMeta").textContent =
+                `${station.distance_to_station}km · 대기 ${station.wait_time_minutes}분 · ${pressure}`;
+
+            document.getElementById("waypointOverlay").classList.add("open");
+        }
+
+        // [취소] 또는 배경 클릭: 팝업만 닫고 아무 동작 안 함.
+        function closeWaypointModal() {
+            document.getElementById("waypointOverlay").classList.remove("open");
+            pendingWaypointMno = null;
+        }
+
+        // [경유지 추가]: 선택 충전소를 전역에 저장하고 팝업을 닫은 뒤 기존 학습 로직을 실행.
+        function confirmWaypoint() {
+            const chrstnMno = pendingWaypointMno;
+            if (!chrstnMno) { closeWaypointModal(); return; }
+            // 지도 경로 표시 단계로 이어질 자리: 선택된 충전소 정보를 전역 변수에 저장.
+            selectedWaypointStation = stationsList.find(st => st.chrstn_mno === chrstnMno) || null;
+            closeWaypointModal();
+            pushWaypoint(chrstnMno);   // 기존 가중치 학습 호출 그대로 실행
+            startWaypointCountdown();  // 신규: 학습 후 5초 카운트다운 패널 표시 → 0이면 자동 안내 시작
+        }
+
+        // ===== COUNTDOWN → NAVIGATION (신규) =====
+        // 경유 충전소 좌표 추출: delivery_payload.latitude/longitude 우선, 없으면 다른 위경도 필드 폴백.
+        function getWaypointLatLon(station) {
+            if (!station) return null;
+            const dp = station.delivery_payload || {};
+            const lat = dp.latitude ?? station.latitude ?? station.let ?? station.lat;
+            const lon = dp.longitude ?? station.longitude ?? station.lon;
+            if (lat == null || lon == null) return null;
+            return { lat: parseFloat(lat), lon: parseFloat(lon) };
+        }
+
+        // 5초 카운트다운 시작: 0이 되면 자동으로 startNavigation() 호출.
+        function startWaypointCountdown() {
+            if (!selectedWaypointStation) return;
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+
+            document.getElementById("navCountdownStation").textContent =
+                selectedWaypointStation.chrstn_nm || "선택한 충전소";
+
+            let remaining = 5;
+            const numEl = document.getElementById("navCountdownNum");
+            numEl.textContent = remaining;
+
+            document.getElementById("navBanner").style.display = "none";
+            document.getElementById("navCountdownPanel").style.display = "flex";
+
+            countdownTimer = setInterval(() => {
+                remaining -= 1;
+                if (remaining <= 0) {
+                    startNavigation();   // 0이 되면 자동 시작
+                    return;
+                }
+                numEl.textContent = remaining;
+            }, 1000);
+
+            logTerminal(`${selectedWaypointStation.chrstn_nm} 경유 안내 5초 후 시작...`);
+        }
+
+        // 안내 시작: 카운트다운 정지 → 패널 닫고 → 안내 상태 on → 지도에 경로선 덧그림 + 배너.
+        function startNavigation() {
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+            document.getElementById("navCountdownPanel").style.display = "none";
+
+            navigationActive = true;
+
+            const stationName = selectedWaypointStation ? (selectedWaypointStation.chrstn_nm || "충전소") : "충전소";
+            document.getElementById("navBannerText").textContent = "안내 중 · " + stationName + " 경유";
+            document.getElementById("navBanner").style.display = "block";
+
+            drawMap();   // navigationActive=true 이므로 drawMap 끝에서 경로선이 덧그려짐
+            logTerminal("경유지 경로 안내를 시작합니다.", "success");
+        }
+
+        // drawMap() 내부에서만 호출. 현재위치 → 경유 충전소 → 목적지를 파란 실선으로 잇고 강조 마커 표시.
+        function drawNavigationRoute(ctx, toCanvas, curPt, destPt) {
+            const wp = getWaypointLatLon(selectedWaypointStation);
+            if (!wp) return;
+            const wpPt = toCanvas(wp.lat, wp.lon);
+
+            // 경로선 (파란 실선)
+            ctx.beginPath();
+            ctx.moveTo(curPt.x, curPt.y);
+            ctx.lineTo(wpPt.x, wpPt.y);
+            ctx.lineTo(destPt.x, destPt.y);
+            ctx.strokeStyle = "#007aff";
+            ctx.lineWidth = 4;
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+            ctx.setLineDash([]);
+            ctx.stroke();
+
+            // 경유 충전소 강조 마커
+            ctx.beginPath();
+            ctx.arc(wpPt.x, wpPt.y, 11, 0, 2*Math.PI);
+            ctx.fillStyle = "#007aff";
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(wpPt.x, wpPt.y, 4, 0, 2*Math.PI);
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+
+            // 경유지 라벨
+            const label = "경유 · " + (selectedWaypointStation.chrstn_nm || "충전소");
+            ctx.font = "bold 11px 'Pretendard', sans-serif";
+            const metrics = ctx.measureText(label);
+            const tw = metrics.width + 12;
+            ctx.fillStyle = "rgba(0,122,255,0.95)";
+            ctx.beginPath();
+            ctx.roundRect(wpPt.x - tw/2, wpPt.y - 30, tw, 18, 5);
+            ctx.fill();
+            ctx.fillStyle = "#fff";
+            ctx.fillText(label, wpPt.x - metrics.width/2, wpPt.y - 17);
+        }
+
+        // ===== PUSH WAYPOINT (LEARNING) =====
+        async function pushWaypoint(chrstnMno) {
+            const userId = document.getElementById("userSelector").value;
+            const selectedPayload = stationsList.find(st => st.chrstn_mno === chrstnMno);
+            if (!selectedPayload) {
+                logTerminal("선택한 충전소를 찾을 수 없습니다.", "warning");
+                return;
+            }
+
+            logTerminal(`${selectedPayload.chrstn_nm} 경로 안내 선택. 가중치 학습 중...`);
+
+            try {
+                const res = await fetch(`/users/${userId}/preferences/learn`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ chrstn_mno: selectedPayload.chrstn_mno })
+                });
+
+                if (res.ok) {
+                    const updatedPreference = await res.json();
+                    setSlider("weightPrice", "weightPriceVal", updatedPreference.weight_price);
+                    setSlider("weightWait", "weightWaitVal", updatedPreference.weight_waiting_time);
+                    setSlider("weightDistance", "weightDistanceVal", updatedPreference.weight_distance);
+                    setSlider("weightFacilities", "weightFacilitiesVal", updatedPreference.weight_facilities);
+                    setSlider("safetyMargin", "safetyMarginVal", updatedPreference.safety_margin);
+                    logTerminal("선택 학습 완료. 가중치 업데이트됨.", "success");
+                    alert("경로 안내가 선택되었습니다. 선호 가중치가 학습되었습니다.");
+                } else {
+                    logTerminal(`학습 실패. status: ${res.status}`, "warning");
+                }
+            } catch (err) {
+                logTerminal("학습 네트워크 오류.", "warning");
+            }
+        }
+    </script>
+</body>
+</html>
+>>>>>>> fba83dc6784a44fac982657ef49bffd2f64de1a6

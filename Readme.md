@@ -1,9 +1,14 @@
 # HY-Connect
 
-수소차 운전자를 위한 개인화 수소충전 경유지 추천 플랫폼입니다.  
+수소차 운전자를 위한 현대자동차 Pleos기반 개인화 수소충전 경유지 추천 플랫폼입니다.  
 차량의 남은 주행가능거리, 충전소 실시간 상태, 대기 차량 수, 판매 가격, 편의시설, 사용자의 선호 가중치를 함께 계산해 실제로 도착하고 충전할 수 있는 충전소를 추천합니다.
 
 이 저장소는 FastAPI 백엔드, SQLAlchemy ORM, Supabase/PostgreSQL 연동, Hying API 동기화, 규칙 기반 자연어 조건 필터, Gemini 기반 추천 사유 메시지 생성, 추천 테스트 대시보드, 홍보용 웹페이지를 함께 포함합니다.
+
+HY-Connect Pleos APP 바로가기 
+```
+https://github.com/gorillaglass1/Hy-Connect-Pleos
+```
 
 ---
 
